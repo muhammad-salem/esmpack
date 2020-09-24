@@ -12,6 +12,38 @@ import {
 
 const args = process.argv;
 const inputs = args.slice(2);
+const help = inputs.includes('-h') || inputs.includes('--help');
+if (help) {
+    let helpStr =
+        `
+Version 0.1.4
+Usage: esmpack [config path] [options]
+
+if no config file in the commend will try to search for file names
+'esmpack.js', 'esmpack.mjs' and 'esmpack.json'.
+
+Examples:
+    esmpack
+    esmpack esmpack.js
+    esmpack esmpack.json -w -d
+    esmpack -v
+    esmpack --help
+
+Options:
+            --prod      build for production, minify modules, css, etc...
+    -d      --debug     output debug messages on internal operations
+    -s      --silent    don't print any thing
+    -w      --watch     watch files for change
+    -h      --help      print help message
+    -v      --version   output the version number`;
+    console.log(helpStr);
+    exit();
+}
+const version = inputs.includes('-v') || inputs.includes('--version');
+if (version) {
+    console.log('0.1.4');
+    exit();
+}
 const watch = inputs.includes('-w') || inputs.includes('--watch');
 const debug = inputs.includes('-d') || inputs.includes('--debug');
 const silent = inputs.includes('-s') || inputs.includes('--silent');
@@ -25,6 +57,18 @@ function lunchApp(config: ESMConfig) {
 
     if (watch) {
         transform.watch();
+    }
+}
+
+function lunchAppForPackageConfig(config: ESMConfig) {
+    const transform = new ESMTransformer(config, process.cwd());
+
+    transform.provider.set(transform.workspacePackage.getName(), transform.workspacePackage);
+    transform.transformDependencies();
+    // transform.transformWorkspace();
+
+    if (watch) {
+        transform.watchForPackage();
     }
 }
 
@@ -94,8 +138,6 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
 }
 
 function initLogLevel() {
-    console.log('init logging');
-
     if (debug) {
         setLogLevel(LogLevel.debug);
     } else if (silent) {
@@ -103,7 +145,6 @@ function initLogLevel() {
     } else {
         setLogLevel(LogLevel.info);
     }
-
 }
 
 function isFound(path: string) {
@@ -114,9 +155,13 @@ if (!configPath) {
     // search for js module as config
     configPath = isFound(resolve(process.cwd(), 'esmpack.js'))
         || isFound(resolve(process.cwd(), 'esmpack.mjs'))
-        || isFound(resolve(process.cwd(), 'esmpack.json'))
-        || isFound(resolve(process.cwd(), 'package.json'));
-    if (!isFound(configPath)) {
+        || isFound(resolve(process.cwd(), 'esmpack.json'));
+    // || isFound(resolve(process.cwd(), 'package.json'));
+    if (isFound(configPath)) {
+        if (debug || !silent) {
+            console.log(`load config from: ${configPath}`);
+        }
+    } else {
         console.error(`no config file found`);
         exit(404);
     }
@@ -152,7 +197,7 @@ if (configPath.endsWith('.json')) {
             workspaceResolution: 'follow'
         };
         let esmConfig = toESMConfig(jsConfig);
-        lunchApp(esmConfig);
+        lunchAppForPackageConfig(esmConfig);
     }
 } else if (/(\.m?js$)|(.json)/g.test(configPath)) {
     // js config
