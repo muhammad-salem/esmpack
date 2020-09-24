@@ -93,15 +93,6 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
     return esmConfig;
 }
 
-function loadConfigFromModule(modulePath: string) {
-    import(modulePath).then(module => {
-        initLogLevel();
-        let jsConfig: JSConfig = module.default;
-        let esmConfig = toESMConfig(jsConfig);
-        lunchApp(esmConfig);
-    });
-}
-
 function initLogLevel() {
     console.log('init logging');
 
@@ -133,10 +124,7 @@ if (!configPath) {
     configPath = resolve(process.cwd(), configPath);
 }
 
-if (/(\.m?js$)|(.json)/g.test(configPath)) {
-    // js config
-    loadConfigFromModule(configPath);
-} if (configPath.endsWith('.json')) {
+if (configPath.endsWith('.json')) {
     initLogLevel();
     // json config
     const jsonObject = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -166,7 +154,16 @@ if (/(\.m?js$)|(.json)/g.test(configPath)) {
         let esmConfig = toESMConfig(jsConfig);
         lunchApp(esmConfig);
     }
+} else if (/(\.m?js$)|(.json)/g.test(configPath)) {
+    // js config
+    import(configPath).then(module => {
+        initLogLevel();
+        let jsConfig: JSConfig = module.default;
+        let esmConfig = toESMConfig(jsConfig);
+        lunchApp(esmConfig);
+    });
 } else {
     // error
     exit(404);
 }
+
