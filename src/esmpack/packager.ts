@@ -20,6 +20,12 @@ export class ESMTransformer {
     workspaceTransformer: TransformerHandler;
     packageTransformer: TransformerHandler;
 
+
+    source: GlopSourceInput;
+    resources: GlopSourceInput;
+    workspacePackage: PackageInfo;
+    jsTransformer: JSTransformer;
+
     constructor(public config: ESMConfig, public cwd: string) {
         this.workspaceTransformer = new WorkspaceTransformerHandler(config);
         this.packageTransformer = new PackageTransformerHandler(config);
@@ -58,11 +64,6 @@ export class ESMTransformer {
             }
         });
     }
-
-    source: GlopSourceInput;
-    resources: GlopSourceInput;
-    workspacePackage: PackageInfo;
-    jsTransformer: JSTransformer;
 
     initService() {
         logger.debug(`init esmpack services.`);
@@ -127,6 +128,10 @@ export class ESMTransformer {
     }
 
     watch() {
+        logger.info(`watch is not supported now.`);
+    }
+
+    watchForPackage() {
         logger.info(`watch is not supported now.`);
     }
 }
