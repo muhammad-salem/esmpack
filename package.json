@@ -1,6 +1,6 @@
 {
   "name": "@aurorats/esmpack",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "esmpack, transform javascript files to es module that can be imported by browser.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,8 +19,7 @@
     "clean": "rimraf ./{dist,buildInfo,bin/esmpack.js,bin/esmpack.d.ts}",
     "build": "yarn clean && tsc -b -v",
     "build:watch": "yarn clean && tsc -b -v -w",
-    "local:publish": "npm unpublish --tag dev --registry http://localhost:4873/ --force && npm publish --tag dev --registry http://localhost:4873/ --force",
-    "loop": "yarn clean && yarn build && yarn local:publish"
+    "local:publish": "npm unpublish --tag dev --registry http://localhost:4873/ --force && npm publish --tag dev --registry http://localhost:4873/ --force"
   },
   "dependencies": {
     "glob": "^7.1.6"
