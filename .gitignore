@@ -102,3 +102,7 @@ dist
 
 # TernJS port file
 .tern-port
+buildInfo/bin.info
+buildInfo/src.info
+bin/esmpack.js
+bin/esmpack.d.ts
