@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "sourceMap": true,
+    "declaration": true,
+    "inlineSources": true,
+    "importHelpers": false,
+    "downlevelIteration": true,
+    "moduleResolution": "Node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": false,
+    "rootDir": ".",
+    "outDir": "../dist",
+    "module": "ESNext",
+    "target": "ES2018",
+    "esModuleInterop": true,
+    "lib": [
+      "ES2018",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ],
+    "composite": true,
+    "tsBuildInfoFile": "../buildInfo/src.info"
+  },
+  "files": [
+    "./index.ts"
+  ],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "build",
+    "dist",
+    "node_modules"
+  ]
+}

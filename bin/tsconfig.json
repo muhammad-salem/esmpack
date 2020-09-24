@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "ESNext",
+        "target": "ES2018",
+        "moduleResolution": "Node",
+        "types": [
+            "node"
+        ],
+        "composite": true,
+        "tsBuildInfoFile": "../buildInfo/bin.info"
+    },
+    "files": [
+        "./esmpack.ts"
+    ]
+}
