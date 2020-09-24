@@ -3,11 +3,16 @@ esmpack, transform javascript files to es module that can be imported by browser
 
 ## `Install`
 
-``` bash
-npm i --save-dev @aurorats/esmpack
-```
+ - As Global
 
 ``` bash
+npm i -g @aurorats/esmpack
+yarn global add @aurorats/esmpack
+```
+ - As Developer Dependencies
+
+``` bash
+npm i --save-dev @aurorats/esmpack
 yarn add --dev @aurorats/esmpack
 ```
 
@@ -283,3 +288,11 @@ export class CSSPlugin extends Plugin {
     }
 }
 ```
+
+## TO:DO
+
+- watch
+- production
+- set extension of module file to '.js' or '.mjs', currently, doesn't override filename.
+- moduleResolution `static` and `flat` : currently `relative` is supported
+- workspaceResolution, `all` and `follow`, currently hard codded.
