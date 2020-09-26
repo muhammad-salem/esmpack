@@ -1,23 +1,124 @@
 import { resolve } from 'path';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
+import { logger } from '../logger/logger.js';
 import { trackPackage } from '../utils/utils.js';
 
-export interface StatementMatch {
+
+export interface NameAlias { name: string, alias?: string }
+
+export type SyntaxType = 'import' | 'export';
+
+export class ImportSyntax {
+
+    static getModuleRegExp() {
+        // return /(import|export)((.*)from\s*)?\s*["'](.*)["'](\s*;)?/g;
+        return /(import|export)\s+?(?:(?:([\w*\s{},ɵ]*)\s+from\s+?)|)((?:".*?")|(?:'.*?'))[\s]*?(?:;|$|)/g;
+    }
+
+    static getImportSyntax(content: string): ImportSyntax[] {
+        if (content) {
+            let match = content.match(ImportSyntax.getModuleRegExp());
+            if (match) {
+                return match
+                    .map(statement => ImportSyntax.getModuleRegExp().exec(statement))
+                    .filter(arr => arr !== null)
+                    .map(match => new ImportSyntax(match as RegExpExecArray));
+            }
+        }
+        return [];
+    }
+
     /**
-     * import statement it self 
-     * import { some-thing, another-thing } from '../data/module';
+     * import defaultExport, { export1 [ , [...] ] } from "module-name";
      */
     statement: string;
+
+    syntaxType: SyntaxType;
     /**
      * the imported objects as written in js file,
-     * some-thing, another-thing
+     * defaultExport
      */
-    object: string;
+    defaultExport?: NameAlias | false = false;
+    /**
+     * '*' is imported or not, if string, had alias2
+     */
+    importAll: NameAlias | false = false;
     /**
      * the module path of import statement
      * (../data/module)
      */
-    path: string;
+    modulePath: string;
+
+    /**
+     * { export1 [ , [...] ] }
+     * 
+     * { export1 , export2 as alias2 , [...] }
+     */
+    exportNames: NameAlias[] = [];
+
+    constructor(match: RegExpExecArray) {
+        this.init(match);
+
+    }
+
+    private getNameAndAlias(str: string): NameAlias {
+        let temp = str.trim().split(/\s/);
+        return { name: temp[0].trim(), alias: temp[2]?.trim() };
+    }
+    private handleDefaultAndAll(nameAlias: NameAlias) {
+        if (nameAlias.name === '*') {
+            this.importAll = nameAlias;
+        } else {
+            this.defaultExport = nameAlias;
+        }
+    }
+    /**
+     * import defaultExport from "module-name";
+     * import * as name from "module-name";
+     * import defaultExport, { export1 [ , [...] ] } from "module-name";
+     * import defaultExport, * as name from "module-name";
+     * 
+     * export * from …; // does not set the default export
+     * export * as name1 from …; // Draft ECMAScript® 2O21
+     */
+    private handleDefaultAndGlobalNames(objectNames: string) {
+        if (objectNames === '*') {
+            this.importAll = { name: '*' };
+        } else if (objectNames.includes(',')) {
+            let temp = objectNames.split(',');
+            temp.map(str => this.getNameAndAlias(str))
+                .forEach(nameAlias => this.handleDefaultAndAll(nameAlias));
+        } else {
+            this.handleDefaultAndAll(this.getNameAndAlias(objectNames));
+        }
+    }
+
+    private handelObjectNames(objectNames: string) {
+        let temp = objectNames.split(',');
+        this.exportNames = temp.map(str => this.getNameAndAlias(str));
+    }
+
+    private init(match: RegExpExecArray) {
+        this.statement = match[0];
+        this.syntaxType = match[1] as SyntaxType;
+        this.modulePath = match[3].substring(1, match[3].length - 1);
+        if (!match[2]) {
+            return;
+        }
+        let objectNames = match[2].trim();
+        let bracesIndex = objectNames.indexOf('{');
+        if (bracesIndex > -1) {
+            if (bracesIndex > 0) {
+                let defaultAndGlobal = objectNames.substring(0, objectNames.lastIndexOf(',', bracesIndex));
+                this.handleDefaultAndGlobalNames(defaultAndGlobal);
+            }
+            objectNames = objectNames.substring(bracesIndex + 1, objectNames.lastIndexOf('}'));
+            this.handelObjectNames(objectNames);
+        } else {
+            this.handleDefaultAndGlobalNames(objectNames);
+        }
+    }
+
 }
 
 /**
@@ -98,14 +199,14 @@ export class JSTransformer {
         return /\.m?js$/g;
     }
 
-    transform(match: StatementMatch, options: TransformOptions): JsTransformDescription | undefined {
-        if (/^\.\.?\/.*\.m?js$/g.test(match.path)) {
+    transform(match: ImportSyntax, options: TransformOptions): JsTransformDescription | undefined {
+        if (/^\.\.?\/.*\.m?js$/g.test(match.modulePath)) {
             return new JsTransformDescription('keep', undefined, undefined, options.pkgInfo);
-        } else if (/^\.\.?\//g.test(match.path)) {
+        } else if (/^\.\.?\//g.test(match.modulePath)) {
             //appendExt: options.pkgInfo.pkg.browser ? '.js' : (options.pkgInfo.isModule ? '.mjs' : '.js')
-            return new JsTransformDescription('inline', match.path, '.js', options.pkgInfo);
+            return new JsTransformDescription('inline', match.modulePath, '.js', options.pkgInfo);
         } else {
-            let pkgTrack = trackPackage(match.path, options.nodeModulePath);
+            let pkgTrack = trackPackage(match.modulePath, options.nodeModulePath);
             if (pkgTrack) {
                 let pkgInfo: PackageInfo, isCreated: boolean = false;
                 if (options.packageProvider.has(pkgTrack.packageName)) {
@@ -121,7 +222,7 @@ export class JSTransformer {
                 return new JsTransformDescription('inline', newPath, ext, pkgInfo);
             } else {
                 console.warn(`Couldn't found package in node_module`, {
-                    path: match.path,
+                    path: match.modulePath,
                     node_module: options.nodeModulePath
                 });
                 return new JsTransformDescription('keep', undefined, undefined, options.pkgInfo);
