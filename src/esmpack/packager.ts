@@ -96,7 +96,7 @@ export class ESMTransformer {
                     logger.debug(`copying dependency: '${dependency.getName()}' files to output dir.`);
                     dependency.copyFiles();
                 }
-                logger.info(`start transform '${dependency.getName()}'.`);
+                logger.info(`transforming '${dependency.getName()}'...`);
                 this.transformerHandler.handle(dependency.srcIndex(), dependency.outIndex(), {
                     jsTransformer: this.jsTransformer,
                     nodeModulePath: this.nodeModulePath,
@@ -106,7 +106,6 @@ export class ESMTransformer {
                     provider: this.provider
                 });
                 dependency.isTransformed = true;
-                logger.info(`done transform '${dependency.getName()}'.`);
             }
         });
     }
