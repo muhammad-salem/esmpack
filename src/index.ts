@@ -5,7 +5,11 @@ export * from './esmpack/source-input.js';
 
 export * from './logger/logger.js';
 
-export * from './plugins/dom.js';
+export * from './plugins/injection/fetch.js';
+export * from './plugins/injection/helpers.js';
+export * from './plugins/injection/inject.js';
+export * from './plugins/injection/promise.js';
+
 export * from './plugins/plugin.js';
 
 export * from './resolution/transform.js';

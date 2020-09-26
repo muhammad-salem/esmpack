@@ -1,7 +1,10 @@
 
-import { StatementMatch } from '../resolution/transform.js';
+import { logger } from '../logger/logger.js';
+import { ImportSyntax, NameAlias } from '../resolution/transform.js';
 import { ClassInfo } from '../utils/class.js';
-import { generateFetch } from './dom.js';
+import { generateFetch } from './injection/fetch.js';
+import { generateInject } from './injection/inject.js';
+import { generateFetchWithPromise } from './injection/promise.js';
 
 /**
  * for now, the output of an Plugin will be static import statement.
@@ -54,17 +57,82 @@ export class PluginResult {
 export abstract class Plugin {
     static getName(): string { return ''; };
     static getRegExp(): RegExp { return new RegExp(''); }
-    transform(match: StatementMatch, path: string): PluginResult {
-        if (/^import\s*['"]/g.test(match.statement) || /^export\s*\*\s*from/g.test(match.statement)) {
-            return new PluginResult('inject', this.inject(path));
-        } else if (/^import\s*\w/g.test(match.statement)) {
-            return new PluginResult('fetch', this.fetch(match.object.trim(), path));
+    // transform(match: ImportSyntax, path: string): PluginResult {
+    //     if (/^import\s*['"]/g.test(match.statement) || /^export\s*\*\s*from/g.test(match.statement)) {
+    //         return new PluginResult('inject', this.inject(path));
+    //     } else if (/^import\s*\w/g.test(match.statement)) {
+    //         return new PluginResult('fetch', this.fetch(match.object.trim(), path));
+    //     } else {
+    //         return new PluginResult('module');
+    //     }
+    // }
+
+    private handelOne(url: string, nameAlias: NameAlias) {
+        if (nameAlias.name === 'promise') {
+            return new PluginResult('fetch', this.fetchWithPromise(url, nameAlias.alias || nameAlias.name));
+        }
+        return new PluginResult('fetch', this.fetch(url, nameAlias.alias || nameAlias.name));
+    }
+    private handelTwo(url: string, name1?: NameAlias, name2?: NameAlias): PluginResult {
+        if (name1 && name2) {
+            if (name1.name === 'promise') {
+                return new PluginResult('fetch', this.fetchWithPromise(url, name1.alias || name1.name, name2.alias || name2.name));
+            } else {
+                return new PluginResult('fetch', this.fetchWithPromise(url, name2.alias || name2.name, name1.alias || name1.name));
+            }
+        } else if (name1 && !name2) {
+            return this.handelOne(url, name1);
+        } else if (name2 && !name1) {
+            return this.handelOne(url, name2);
         } else {
-            return new PluginResult('module');
+            // error remove import statement for now
+            return new PluginResult('inject', '');
         }
     }
+    transform(importSyntax: ImportSyntax, path: string): PluginResult {
+        if (!importSyntax.importAll &&
+            !importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 0) {
+            // just import file
+            return new PluginResult('inject', this.inject(path));
+        }
+        if (!importSyntax.importAll &&
+            importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 0) {
+            // default import
+            let propName = importSyntax.defaultExport.alias || importSyntax.defaultExport.name;
+            return new PluginResult('fetch', this.fetch(path, propName));
+        }
+        if (importSyntax.importAll &&
+            !importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 0) {
+            // all import
+            return this.handelTwo(path, { name: 'promise' }, { name: 'value' });
+        }
+        if (importSyntax.importAll &&
+            importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 0) {
+            // all import with default
+            return this.handelTwo(path, importSyntax.defaultExport, { name: 'value' });
+        }
+        if (!importSyntax.importAll &&
+            !importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 1) {
+            return this.handelOne(path, importSyntax.exportNames[0]);
+        }
+        if (!importSyntax.importAll &&
+            !importSyntax.defaultExport &&
+            importSyntax.exportNames.length === 2) {
+            this.handelTwo(path, importSyntax.exportNames[0], importSyntax.exportNames[1]);
+        }
+        logger.error('error handle import statement', importSyntax, path);
+        // error remove import statement for now
+        return new PluginResult('inject', '');
+
+    }
     abstract inject(url: string): string;
-    abstract fetch(importName: string, url: string): string;
+    abstract fetch(url: string, importName: string): string;
+    abstract fetchWithPromise(url: string, promiseName: string, importName?: string): string;
 }
 
 export type PluginHandler = { regexp: RegExp; handler: Plugin; };
@@ -74,10 +142,13 @@ export const BuiltinPlugin = new Map<string, PluginHandler>();
 @ClassInfo('css', /\.css$/g, BuiltinPlugin)
 export class CSSPlugin extends Plugin {
     inject(url: string): string {
-        return generateFetch('style', '', url);
+        return generateInject('style', url);
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('text', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('text', promiseName, url, importName);
     }
 }
 
@@ -86,8 +157,11 @@ export class HTMLPlugin extends Plugin {
     inject(url: string): string {
         throw new Error('Method not implemented.');
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('text', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('text', promiseName, url, importName);
     }
 }
 
@@ -96,8 +170,11 @@ export class TextPlugin extends Plugin {
     inject(url: string): string {
         throw new Error('Method not implemented.');
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('text', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('text', promiseName, url, importName);
     }
 }
 
@@ -107,8 +184,11 @@ export class JSONPlugin extends Plugin {
     inject(url: string): string {
         throw new Error('Method not implemented.');
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('json', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('json', promiseName, url, importName);
     }
 }
 
@@ -144,8 +224,11 @@ export class ImagePlugin extends Plugin {
     inject(url: string): string {
         throw new Error('Method not implemented.');
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('image', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('image', promiseName, url, importName);
     }
 }
 
@@ -173,8 +256,11 @@ export class AudioPlugin extends Plugin {
     inject(url: string): string {
         throw new Error('Method not implemented.');
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         return generateFetch('audio', importName, url);
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        return generateFetchWithPromise('audio', promiseName, url, importName);
     }
 }
 

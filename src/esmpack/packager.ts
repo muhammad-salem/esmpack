@@ -1,14 +1,12 @@
 import { resolve } from 'path';
 import { JSTransformer } from '../resolution/transform.js';
-import { mkdirSyncIfNotExists, trackNodeModulePath, trackPackage } from '../utils/utils.js';
+import { isFile, mkdirSyncIfNotExists, trackNodeModulePath, trackPackage } from '../utils/utils.js';
 import { ESMConfig } from './config.js';
 import { getPackageInfo, PackageInfo, PackageJson } from './package-info.js';
 
 import { GlopSourceInput } from './source-input.js';
-import {
-    PackageTransformerHandler, WorkspaceTransformerHandler, TransformerHandler
-} from '../resolution/package.js';
-import { copyFileSync, existsSync } from 'fs';
+import { TransformerHandler } from '../resolution/package.js';
+import { copyFileSync } from 'fs';
 import { logger } from '../logger/logger.js';
 
 
@@ -17,8 +15,9 @@ export class ESMTransformer {
     provider = new Map<string, PackageInfo>();
     nodeModulePath: string;
 
-    workspaceTransformer: TransformerHandler;
-    packageTransformer: TransformerHandler;
+    // workspaceTransformer: TransformerHandler;
+    // packageTransformer: TransformerHandler;
+    transformerHandler: TransformerHandler;
 
 
     source: GlopSourceInput;
@@ -27,8 +26,9 @@ export class ESMTransformer {
     jsTransformer: JSTransformer;
 
     constructor(public config: ESMConfig, public cwd: string) {
-        this.workspaceTransformer = new WorkspaceTransformerHandler(config);
-        this.packageTransformer = new PackageTransformerHandler(config);
+        // this.workspaceTransformer = new WorkspaceTransformerHandler(config);
+        // this.packageTransformer = new PackageTransformerHandler(config);
+        this.transformerHandler = new TransformerHandler(config);
         this.initService();
     }
 
@@ -36,10 +36,14 @@ export class ESMTransformer {
         if (!pkgJson.dependencies) {
             return;
         }
-        Object.keys(pkgJson.dependencies).forEach(name => {
-            let pkgTrack = trackPackage(name, nodeModulePath);
-            if (pkgTrack) {
-                if (!provider.has(pkgTrack.packageName)) {
+        let modules = Object.keys(pkgJson.dependencies);
+        if (pkgJson.peerDependencies) {
+            modules = modules.concat(Object.keys(pkgJson.peerDependencies));
+        }
+        modules.forEach(name => {
+            if (!provider.has(name)) {
+                let pkgTrack = trackPackage(name, nodeModulePath);
+                if (pkgTrack) {
                     if (pkgTrack.packagePath) {
                         let info = getPackageInfo(pkgTrack.packagePath, outDir);
                         provider.set(name, info);
@@ -53,23 +57,26 @@ export class ESMTransformer {
 
     copyResourcesToSource(resources: string[], pkgInfo: PackageInfo) {
         logger.info(`copy workspace resources: '${pkgInfo.getName()}'.`);
-        resources.forEach(path => {
-            let outPath = pkgInfo.resolveSrc(path);
-            Object.keys(this.config.pathMap || {}).forEach(key => {
-                outPath = outPath.replace(key, this.config.pathMap[key]);
-            });
-            if (existsSync(path)) {
+        let mapKeys = Object.keys(this.config.pathMap || {});
+        if (mapKeys.length === 0) {
+            return;
+        }
+        resources.filter(path => isFile(path))
+            .forEach(path => {
+                let outPath = pkgInfo.resolveSrc(path);
+                mapKeys.forEach(key => {
+                    outPath = outPath.replace(key, this.config.pathMap[key]);
+                });
                 mkdirSyncIfNotExists(resolve(outPath, '..'));
                 copyFileSync(path, outPath);
-            }
-        });
+            });
     }
 
     initService() {
         logger.debug(`init esmpack services.`);
         this.nodeModulePath = trackNodeModulePath(this.cwd);
         if (!this.nodeModulePath) {
-            logger.exception("couldn't found node_module, please run npm install.");
+            throw new Error("couldn't found node_module, please run npm install.");
         }
         this.source = new GlopSourceInput(this.config.src);
         this.resources = new GlopSourceInput(this.config.resources);
@@ -80,7 +87,6 @@ export class ESMTransformer {
 
         logger.info(`search workspace for dependencies.`);
         this.addToProvider(this.provider, this.workspacePackage.packageModel, this.nodeModulePath, this.config.outDir);
-
     }
 
     transformDependencies() {
@@ -91,7 +97,7 @@ export class ESMTransformer {
                     dependency.copyFiles();
                 }
                 logger.info(`start transform '${dependency.getName()}'.`);
-                this.packageTransformer.handle(dependency.srcIndex(), dependency.outIndex(), {
+                this.transformerHandler.handle(dependency.srcIndex(), dependency.outIndex(), {
                     jsTransformer: this.jsTransformer,
                     nodeModulePath: this.nodeModulePath,
                     packageInfo: dependency,
@@ -105,6 +111,13 @@ export class ESMTransformer {
         });
     }
 
+    // private getWorkspaceTransformer(): TransformerHandler {
+    //     if (this.config.workspaceResolution === 'follow') {
+    //         return this.packageTransformer;
+    //     }
+    //     return this.workspaceTransformer;
+    // }
+
     transformWorkspace() {
         if (!this.config.prod) {
             logger.info(`copying workspace '${this.workspacePackage.getName()}' files to output dir.`);
@@ -112,16 +125,22 @@ export class ESMTransformer {
         }
         this.copyResourcesToSource(this.resources.getFiles(), this.workspacePackage);
         logger.info(`start transform workspace '${this.workspacePackage.getName()}'.`);
+        // let transformer = this.getWorkspaceTransformer();
+
+        let transformedFiles: string[] = [];
         this.source.getFiles().forEach(path => {
+            if (transformedFiles.includes(path)) {
+                return;
+            }
             logger.info(`transform '${path}'.`);
-            this.workspaceTransformer.handle(path, this.workspacePackage.resolveOut(path), {
+            this.transformerHandler.handle(path, this.workspacePackage.resolveOut(path), {
                 jsTransformer: this.jsTransformer,
                 nodeModulePath: this.nodeModulePath,
                 packageInfo: this.workspacePackage,
                 plugins: this.config.plugins,
                 outDir: this.config.outDir,
                 provider: this.provider
-            });
+            }, transformedFiles);
         });
         this.workspacePackage.isTransformed = true;
         logger.info(`done transform workspace'${this.workspacePackage.getName()}'.`);

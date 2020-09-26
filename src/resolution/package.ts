@@ -1,11 +1,11 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { relative, resolve, sep } from 'path';
-import { JsTransformDescription, JSTransformer, StatementMatch } from './transform.js';
+import { ImportSyntax, JsTransformDescription, JSTransformer } from './transform.js';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
-import { generateFetch } from '../plugins/dom.js';
 import { PluginHandler } from '../plugins/plugin.js';
-import { getFileExtension, matchFileExtension, mkdirSyncIfNotExists, resolveTrackPackagePath, trackPackage } from '../utils/utils.js';
+import { getFileExtension, isDirectory, matchFileExtension, mkdirSyncIfNotExists, resolveTrackPackagePath, trackPackage } from '../utils/utils.js';
 import { ESMConfig } from '../esmpack/config.js';
+import { generateHelper } from '../plugins/injection/helpers.js';
 
 export interface HelperOptions {
     jsTransformer: JSTransformer;
@@ -16,74 +16,19 @@ export interface HelperOptions {
     outDir: string;
 }
 
-export const SearchPatterns = {
+export function getCommentPattern() {
+    return /\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/g;
+}
 
-    gImportPattern() {
-        return /import(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/g;
-    },
-
-    gmImportPattern() {
-        return /import(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/gm;
-    },
-
-    gDynamicImportPattern() {
-        return /import\((?:["'\s]*([\w*{}\n\r\t, ]+)\s*)?["'\s](.*([@\w_-]+))["'\s].*\);$/g;
-    },
-
-    gmDynamicImportPattern() {
-        return /import\((?:["'\s]*([\w*{}\n\r\t, ]+)\s*)?["'\s](.*([@\w_-]+))["'\s].*\);$/gm;
-    },
-
-    gExportPattern() {
-        return /export(?:["'\s]*([\w*${}\n\r\t, ]+)\s*from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/g;
-    },
-
-    gmExportPattern() {
-        return /export(?:["'\s]*([\w*${}\n\r\t, ]+)\s*from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/gm;
-    },
-
-    gCommentPattern() {
-        return /\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/g;
-    },
-
-    gmCommentPattern() {
-        return /\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm;
-    }
-
-};
-
-
-export abstract class TransformerHandler {
+export class TransformerHandler {
 
     constructor(protected config: ESMConfig) { }
 
-    private getImportMatch(content: string): RegExpExecArray[] {
-        if (content) {
-            let match = content.match(SearchPatterns.gmImportPattern());
-            if (match) {
-                return match.map(statement => SearchPatterns.gImportPattern().exec(statement))
-                    .filter(arr => arr !== null) as RegExpExecArray[];
-            }
-        }
-        return [];
-    }
-
-    private getExportMatch(content: string): RegExpExecArray[] {
-        if (content) {
-            let match = content.match(SearchPatterns.gmExportPattern());
-            if (match) {
-                return match.map(statement => SearchPatterns.gExportPattern().exec(statement))
-                    .filter(arr => arr !== null) as RegExpExecArray[];
-            }
-        }
-        return [];
-    }
-
     private removeComments(content: string) {
-        return content.replace(SearchPatterns.gmCommentPattern(), '');
+        return content.replace(getCommentPattern(), '');
     }
 
-    searchPlugin(path: string, plugins: PluginHandler[]) {
+    private searchPlugin(path: string, plugins: PluginHandler[]) {
         return plugins.find(plugin => {
             let isTheOne = plugin.regexp.test(path);
             plugin.regexp.lastIndex = 0;
@@ -91,10 +36,9 @@ export abstract class TransformerHandler {
         });
     }
 
-    handle(input: string, output: string, opt: HelperOptions): void {
-
-        if (!existsSync(input)) {
-            return;
+    handle(input: string, output: string, opt: HelperOptions, transformedFiles: string[] = []): string[] | false {
+        if (isDirectory(input) || !existsSync(input) || transformedFiles.includes(output)) {
+            return false;
         }
         let content = readFileSync(input, 'utf8').toString();
         const srcDir = resolve(input, '..');
@@ -106,37 +50,30 @@ export abstract class TransformerHandler {
         let followImport: { src: string, out: string }[] = [];
         let injectModuleInfo = false;
 
-        let allMatch = this.getExportMatch(searchContent);
-        allMatch = allMatch.concat(this.getImportMatch(searchContent));
+        let allMatch = ImportSyntax.getImportSyntax(searchContent);
 
-        allMatch.map(match => {
-            return {
-                statement: match[0],
-                object: match[1],
-                path: match[2]
-            } as StatementMatch
-        }).forEach(match => {
-            let ext = matchFileExtension(match.path);
+        allMatch.forEach(match => {
+            let ext = matchFileExtension(match.modulePath);
             if (ext && ! /m?js/g.test(ext[1])) {
                 // plugin scope
-                let plugin = this.searchPlugin(match.path, opt.plugins);
+                let plugin = this.searchPlugin(match.modulePath, opt.plugins);
                 if (!plugin) {
                     console.error(`can't find module for file extension '${ext[1]}'`, match.statement);
                     return;
                 }
                 let filePath: string, outPath: string;
-                if (/^\./.test(match.path)) {
+                if (/^\./.test(match.modulePath)) {
                     // workspace resources
-                    outPath = resolve(outDir, match.path);
-                    filePath = resolve(srcDir, match.path);
+                    outPath = resolve(outDir, match.modulePath);
+                    filePath = resolve(srcDir, match.modulePath);
                     if (!existsSync(filePath)) {
                         // try to resolve from resources
                         return;
                     }
                 } else {
-                    let pkgTrack = trackPackage(match.path, opt.nodeModulePath);
+                    let pkgTrack = trackPackage(match.modulePath, opt.nodeModulePath);
                     if (!pkgTrack) {
-                        console.error(`can't find node package resources for '${match.path}'`);
+                        console.error(`can't find node package resources for '${match.modulePath}'`);
                         return;
                     }
                     let pkgInfo: PackageInfo;
@@ -201,62 +138,49 @@ export abstract class TransformerHandler {
             }
         });
         if (this.config.prod) {
-
             if (injectModuleInfo) {
-                content = generateFetch('define:prod') + content;
+                content = generateHelper('define:prod') + content;
             }
             // minify content before write
 
         } else {
             if (injectModuleInfo) {
-                content = content + '\n' + generateFetch('define:dev');
+                content = content + '\n' + generateHelper('define:dev');
             }
         }
 
         writeFileSync(output, content);
         content = searchContent = '';
-        followImport.forEach(item => this.handle(item.src, item.out, opt));
+        transformedFiles.push(output);
+        followImport.forEach(item => this.handle(item.src, item.out, opt, transformedFiles));
+        // return [input].concat(followImport.map(files => files.src));
+        return transformedFiles;
     }
 
-    abstract handleStatementAction(opt: StatementActionOptions): void;
+    // abstract handleStatementAction(opt: StatementActionOptions): void;
+    handleStatementAction(opt: StatementActionOptions): void {
+        let followPath = opt.match.modulePath;
+        if (opt.result?.action === 'inline' && opt.result.inlinePath && /^\/|\.\/|\.\.\//.test(opt.result.inlinePath)) {
+            let newPath = opt.result.inlinePath + (opt.result.appendExt ? opt.result.appendExt : '');
+            let newStatement = opt.match.statement.replace(opt.match.modulePath, newPath);
+            opt.content = opt.content.replace(opt.match.statement, newStatement);
+            if (opt.result.pkgInfo && opt.result.pkgInfo !== opt.helperOptions.packageInfo) {
+                return;
+            }
+            followPath = newPath;
+        }
+        let followSrc = resolve(opt.srcDir, followPath);
+        let followOut = resolve(opt.outDir, followPath);
+        opt.followImport.push({ src: followSrc, out: followOut });
+    }
 }
 
 export interface StatementActionOptions {
     result: JsTransformDescription;
     content: string;
-    match: StatementMatch;
+    match: ImportSyntax;
     helperOptions: HelperOptions;
     followImport: { src: string, out: string }[];
     srcDir: string;
     outDir: string;
-}
-
-export class PackageTransformerHandler extends TransformerHandler {
-
-    handleStatementAction(opt: StatementActionOptions): void {
-        if (opt.result?.action === 'inline' && opt.result.inlinePath && /^\/|\.\/|\.\.\//.test(opt.result.inlinePath)) {
-            let newPath = opt.result.inlinePath + (opt.result.appendExt ? opt.result.appendExt : '');
-            let newStatement = opt.match.statement.replace(opt.match.path, newPath);
-            opt.content = opt.content.replace(opt.match.statement, newStatement);
-            if (opt.result.pkgInfo && opt.result.pkgInfo !== opt.helperOptions.packageInfo) {
-                return;
-            }
-        }
-        let followSrc = resolve(opt.srcDir, opt.match.path);
-        let followOut = resolve(opt.outDir, opt.match.path);
-        opt.followImport.push({ src: followSrc, out: followOut });
-    }
-
-}
-
-export class WorkspaceTransformerHandler extends TransformerHandler {
-
-    handleStatementAction(opt: StatementActionOptions): void {
-        if (opt.result?.action === 'inline' && opt.result.inlinePath && /^\/|\.\/|\.\.\//.test(opt.result.inlinePath)) {
-            let newPath = opt.result.inlinePath + (opt.result.appendExt ? opt.result.appendExt : '');
-            let newStatement = opt.match.statement.replace(opt.match.path, newPath);
-            opt.content = opt.content.replace(opt.match.statement, newStatement);
-        }
-    }
-
 }
