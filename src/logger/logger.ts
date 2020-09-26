@@ -6,7 +6,6 @@ export interface LoggerInterface {
     info(...data: any[]): void;
     debug(...data: any[]): void;
     error(...data: any[]): void;
-    exception(message?: string, ...optionalParams: any[]): void;
 }
 
 let level: LogLevel = LogLevel.info;
@@ -33,11 +32,6 @@ export class Logger implements LoggerInterface {
     error(...data: any[]): void {
         console.log(...data);
     }
-
-    exception(message?: string, ...optionalParams: any[]): void {
-        console.exception(message, optionalParams.length === 0 ? undefined : optionalParams);
-    }
-
 }
 
 export const logger = new Logger();
