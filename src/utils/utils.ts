@@ -1,10 +1,9 @@
-import { Dir, existsSync, mkdirSync } from 'fs';
-import { relative, resolve, sep } from 'path';
-
+import { Dir, existsSync, lstatSync, mkdirSync } from 'fs';
+import { resolve, sep } from 'path';
 
 export function isContainNodePackage(dir: Dir | string) {
     let path = dir instanceof Dir ? dir.path : dir;
-    return existsSync(path) && existsSync((path = path + sep + 'package.json')) && path;
+    return existsSync(path) && existsSync((path = resolve(path, 'package.json'))) && path;
 }
 
 export function isNodeModule(dir: Dir | string) {
@@ -17,8 +16,6 @@ export function isContainNodeModule(dir: Dir | string) {
     let path = dir instanceof Dir ? dir.path : dir;
     return existsSync(path) && existsSync((path = path + sep + 'node_modules')) && path;
 }
-
-
 
 export function getJSModuleFilePath(importPath: string): string | undefined {
     if (importPath.endsWith('.js') || importPath.endsWith('.mjs')) {
@@ -40,8 +37,7 @@ export function trackNodeModulePath(cwd: string): string {
     let path = isContainNodeModule(cwd);
     if (path) {
         return path;
-    }
-    if (cwd === sep || !path) {
+    } else if (cwd === sep) {
         return '';
     }
     return trackNodeModulePath(resolve(cwd, '..'));
@@ -60,6 +56,9 @@ export function trackPackage(pkgName: string, nodeModulePath: string = ''): Trac
 
     let subPath = pkgName.substring(pkgName.lastIndexOf('/') + 1);
     pkgName = pkgName.substring(0, pkgName.lastIndexOf('/'));
+    if (pkgName === '') {
+        return;
+    }
     let pkg = trackPackage(pkgName, nodeModulePath);
     if (pkg) {
         pkg.subPath = pkg.subPath ? (pkg.subPath + '/' + subPath) : subPath;
@@ -86,4 +85,12 @@ export function getFileExtension(filePath: string) {
     if (ext) {
         return ext[1];
     }
+}
+
+export function isDirectory(path: string) {
+    return existsSync(path) && lstatSync(path).isDirectory();
+}
+
+export function isFile(path: string) {
+    return existsSync(path) && lstatSync(path).isFile();
 }
