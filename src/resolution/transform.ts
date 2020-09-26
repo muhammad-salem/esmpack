@@ -4,9 +4,37 @@ import { logger } from '../logger/logger.js';
 import { trackPackage } from '../utils/utils.js';
 
 
-export interface NameAlias { name: string, alias?: string }
+export class NameAlias {
+    constructor(public name: string, public alias?: string) { }
 
-export type SyntaxType = 'import' | 'export';
+    hasAlias() {
+        return this.alias ? true : false;
+    }
+
+    isImportAll() {
+        return this.name === '*';
+    }
+
+    isPromise() {
+        return this.name === 'promise';
+    }
+
+    getName() {
+        return this.alias || this.name;
+    }
+}
+
+export type SyntaxTypeRef = 'import' | 'export';
+
+export class SyntaxType {
+    constructor(public syntaxType: SyntaxTypeRef) { }
+    isImport() {
+        return this.syntaxType === 'import';
+    }
+    isExport() {
+        return this.syntaxType === 'export';
+    }
+}
 
 export class ImportSyntax {
 
@@ -58,12 +86,11 @@ export class ImportSyntax {
 
     constructor(match: RegExpExecArray) {
         this.init(match);
-
     }
 
     private getNameAndAlias(str: string): NameAlias {
         let temp = str.trim().split(/\s/);
-        return { name: temp[0].trim(), alias: temp[2]?.trim() };
+        return new NameAlias(temp[0].trim(), temp[2]?.trim());
     }
     private handleDefaultAndAll(nameAlias: NameAlias) {
         if (nameAlias.name === '*') {
@@ -83,7 +110,7 @@ export class ImportSyntax {
      */
     private handleDefaultAndGlobalNames(objectNames: string) {
         if (objectNames === '*') {
-            this.importAll = { name: '*' };
+            this.importAll = new NameAlias('*');
         } else if (objectNames.includes(',')) {
             let temp = objectNames.split(',');
             temp.map(str => this.getNameAndAlias(str))
@@ -100,7 +127,7 @@ export class ImportSyntax {
 
     private init(match: RegExpExecArray) {
         this.statement = match[0];
-        this.syntaxType = match[1] as SyntaxType;
+        this.syntaxType = new SyntaxType(match[1] as SyntaxTypeRef);
         this.modulePath = match[3].substring(1, match[3].length - 1);
         if (!match[2]) {
             return;
@@ -117,6 +144,30 @@ export class ImportSyntax {
         } else {
             this.handleDefaultAndGlobalNames(objectNames);
         }
+    }
+
+    hasExports() {
+        return this.importAll || this.defaultExport || this.exportNames.length > 0;
+    }
+
+    isImportAllOnly() {
+        return !(this.defaultExport || this.exportNames.length > 0) && this.importAll as NameAlias;
+    }
+
+    isDefaultExportOnly() {
+        return !(this.importAll || this.exportNames.length > 0) && this.defaultExport as NameAlias;
+    }
+
+    isExportNamesOnly() {
+        return this.exportNames.length > 0 && !(this.importAll || this.defaultExport);
+    }
+
+    isDefaultAndImportAll() {
+        return this.defaultExport && this.importAll && this.importAll.alias && !(this.exportNames.length > 0);
+    }
+
+    isExportNamesAndDefault() {
+        return !this.importAll && this.defaultExport && (this.exportNames.length > 0);
     }
 
 }
