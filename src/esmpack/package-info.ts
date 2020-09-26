@@ -1,7 +1,7 @@
 import { copyFileSync } from 'fs';
 import { relative, resolve, sep } from 'path';
 import { readJSON } from '../utils/reader.js';
-import { mkdirSyncIfNotExists } from '../utils/utils.js';
+import { isFile, mkdirSyncIfNotExists } from '../utils/utils.js';
 import { SourceInput } from './config.js';
 import { GlopSourceInput } from './source-input.js';
 
@@ -34,6 +34,7 @@ export interface PackageJson {
     repository: string;
     license: string;
     dependencies: { [key: string]: string };
+    peerDependencies: { [key: string]: string };
     devDependencies: { [key: string]: string };
     sideEffects: boolean;
 
@@ -57,7 +58,7 @@ export class PackageInfo {
             buildDir = buildDir.substring(0, slash);
         }
         let srcInput: SourceInput = {
-            include: [this.src + '/**/*.*'],
+            include: [this.src + '/**/*'],
             exclude: [
                 this.src + '/node_modules/**/*',
                 this.src + '/' + buildDir + '/**/*'
@@ -68,8 +69,10 @@ export class PackageInfo {
         files.forEach(file => {
             let out = file.replace(this.src, '.');
             out = this.resolveOut(out);
-            mkdirSyncIfNotExists(resolve(out, '..'));
-            copyFileSync(file, out);
+            if (isFile(file)) {
+                mkdirSyncIfNotExists(resolve(out, '..'));
+                copyFileSync(file, out);
+            }
         });
     }
     getName() {
