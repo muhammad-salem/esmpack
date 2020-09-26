@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import {
+    existsSync, lstatSync, readdirSync,
+    readFileSync, rmdirSync, unlinkSync
+} from 'fs';
+import { join, resolve } from 'path';
 import { exit } from 'process';
 import {
     CSSPlugin, ESMConfig, HTMLPlugin, ImagePlugin, JSONPlugin,
     TextPlugin, ESMTransformer, findPluginByName, JSConfig,
-    setLogLevel, LogLevel, PackageJson, getPackageIndex
+    setLogLevel, LogLevel, PackageJson, getPackageIndex, logger
 } from '../dist/index.js';
 
 
@@ -50,7 +53,23 @@ const silent = inputs.includes('-s') || inputs.includes('--silent');
 const prod = inputs.includes('--prod');
 let configPath = inputs.find(arg => /(\.m?js$)|(.json)/g.test(arg));
 
+
+function deleteFolderRecursive(dirPath: string) {
+    if (existsSync(dirPath)) {
+        readdirSync(dirPath).forEach((file, index) => {
+            const curPath = join(dirPath, file);
+            if (lstatSync(curPath).isDirectory()) { // recurse
+                deleteFolderRecursive(curPath);
+            } else { // delete file
+                unlinkSync(curPath);
+            }
+        });
+        rmdirSync(dirPath);
+    }
+    logger.debug(dirPath, ' -- removed');
+}
 function lunchApp(config: ESMConfig) {
+    deleteFolderRecursive(config.outDir);
     const transform = new ESMTransformer(config, process.cwd());
     transform.transformDependencies();
     transform.transformWorkspace();
@@ -61,8 +80,8 @@ function lunchApp(config: ESMConfig) {
 }
 
 function lunchAppForPackageConfig(config: ESMConfig) {
+    deleteFolderRecursive(config.outDir);
     const transform = new ESMTransformer(config, process.cwd());
-
     transform.provider.set(transform.workspacePackage.getName(), transform.workspacePackage);
     transform.transformDependencies();
     // transform.transformWorkspace();
@@ -199,7 +218,7 @@ if (configPath.endsWith('.json')) {
         let esmConfig = toESMConfig(jsConfig);
         lunchAppForPackageConfig(esmConfig);
     }
-} else if (/(\.m?js$)|(.json)/g.test(configPath)) {
+} else if (/\.m?js$/g.test(configPath)) {
     // js config
     import(configPath).then(module => {
         initLogLevel();
@@ -209,6 +228,7 @@ if (configPath.endsWith('.json')) {
     });
 } else {
     // error
+    console.error('config file is nt supported.');
     exit(404);
 }
 
