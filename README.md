@@ -1,4 +1,20 @@
 # esmpack
+
+[![NPM Version][npm-image]][npm-url]
+[![NPM Downloads][downloads-image]][downloads-url]
+[![LICENSE][license-img]][license-url]
+![npm-dependencies][npm-dep-url]
+![GitHub contributors][contributors]
+
+[npm-image]: https://img.shields.io/npm/v/@aurorats/esmpack.svg
+[npm-url]: https://npmjs.org/package/@aurorats/esmpack
+[downloads-image]: https://img.shields.io/npm/dt/@aurorats/esmpack
+[downloads-url]: https://npmjs.org/package/@aurorats/esmpack
+[license-img]: https://img.shields.io/github/license/aurorats/esmpack
+[license-url]: https://github.com/aurorats/esmpack/blob/master/LICENSE
+[npm-dep-url]: https://img.shields.io/david/aurorats/esmpack.svg?maxAge=2592000
+[contributors]: https://img.shields.io/github/contributors/aurorats/esmpack
+
 esmpack, transform javascript files to es module that can be imported by browser.
 
 ## `Install`
@@ -257,15 +273,17 @@ export interface JSConfig {
 - to create a plugin must extend class `Plugin` and provide plugin name and regex for testing
 
 ```ts
+import { ClassInfo, Plugin } from '@aurorats/esmpack';
 @ClassInfo('css', /\.css$/g)
 export class CSSPlugin extends Plugin {
     inject(url: string): string {
         // import 'bootstrap/dist/css/bootstrap.min.css';
-        
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         // import bootstrap from 'bootstrap/dist/css/bootstrap.min.css';
-        
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        // import bootstrap, {promise as whenCSSFileLoaded} from './bootstrap.min.css';
     }
 }
 ```
@@ -273,6 +291,7 @@ export class CSSPlugin extends Plugin {
 or Simply
 
 ```ts
+import { Plugin } from '@aurorats/esmpack';
 export class CSSPlugin extends Plugin {
 
     static getName(): string { return 'css'; };
@@ -280,11 +299,12 @@ export class CSSPlugin extends Plugin {
 
     inject(url: string): string {
         // import 'bootstrap/dist/css/bootstrap.min.css';
-
     }
-    fetch(importName: string, url: string): string {
+    fetch(url: string, importName: string): string {
         // import bootstrap from 'bootstrap/dist/css/bootstrap.min.css';
-        
+    }
+    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
+        // import bootstrap, {promise as whenCSSFileLoaded} from './bootstrap.min.css';
     }
 }
 ```
@@ -295,4 +315,3 @@ export class CSSPlugin extends Plugin {
 - production
 - set extension of module file to '.js' or '.mjs', currently, doesn't override filename.
 - moduleResolution `static` and `flat` : currently `relative` is supported
-- workspaceResolution, `all` and `follow`, currently hard codded.
