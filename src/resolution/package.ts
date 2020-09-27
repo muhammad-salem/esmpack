@@ -62,18 +62,26 @@ export class TransformerHandler {
                     return;
                 }
                 let filePath: string, outPath: string;
-                if (/^\./.test(match.modulePath)) {
+                let modulePath: string;
+                let mark = match.modulePath.indexOf('!');
+                if (mark > 0) {
+                    // any of MarkType
+                    modulePath = match.modulePath.substring(mark + 1);
+                } else {
+                    modulePath = match.modulePath;
+                }
+                if (/^\./.test(modulePath)) {
                     // workspace resources
-                    outPath = resolve(outDir, match.modulePath);
-                    filePath = resolve(srcDir, match.modulePath);
+                    outPath = resolve(outDir, modulePath);
+                    filePath = resolve(srcDir, modulePath);
                     if (!existsSync(filePath)) {
                         // try to resolve from resources
                         return;
                     }
                 } else {
-                    let pkgTrack = trackPackage(match.modulePath, opt.nodeModulePath);
+                    let pkgTrack = trackPackage(modulePath, opt.nodeModulePath);
                     if (!pkgTrack) {
-                        console.error(`can't find node package resources for '${match.modulePath}'`);
+                        console.error(`can't find node package resources for '${modulePath}'`);
                         return;
                     }
                     let pkgInfo: PackageInfo;

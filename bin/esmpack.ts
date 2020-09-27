@@ -8,7 +8,7 @@ import { join, resolve } from 'path';
 import { exit } from 'process';
 import {
     ESMConfig, ESMTransformer, findPluginByName, JSConfig,
-    setLogLevel, LogLevel, PackageJson, getPackageIndex, logger, TypeOf
+    setLogLevel, LogLevel, PackageJson, getPackageIndex, logger, TypeOf, Plugin, PluginHandler
 } from '../dist/index.js';
 
 
@@ -139,14 +139,19 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
         prod
     };
 
-    esmConfig.plugins = jsConfig.plugins.map(pluginRef => {
-        if (typeof pluginRef === 'object') {
-            // return findPluginByName(pluginRef.name, pluginRef.action);
-            return pluginRef;
-        } else if (typeof pluginRef === 'string') {
-            return findPluginByName(pluginRef);
-        }
-    })
+    esmConfig.plugins = jsConfig.plugins
+        .map(pluginRef => {
+            if (typeof pluginRef === 'string') {
+                return findPluginByName(pluginRef);
+            } else if (typeof pluginRef === 'object') {
+                // return findPluginByName(pluginRef.name, pluginRef.action);
+                if (pluginRef.moduleType) {
+                    return { regexp: pluginRef.test, handler: new Plugin(pluginRef.moduleType) } as PluginHandler;
+                } else {
+                    return { regexp: pluginRef.test, handler: { transform: pluginRef.handler } } as PluginHandler;
+                }
+            }
+        })
         .filter(plugin => plugin);
     return esmConfig;
 }

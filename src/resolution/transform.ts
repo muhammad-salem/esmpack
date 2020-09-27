@@ -1,5 +1,6 @@
 import { resolve } from 'path';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
+import { FetchType, MarkType } from '../plugins/injection/fetch.js';
 import { trackPackage } from '../utils/utils.js';
 
 
@@ -28,6 +29,10 @@ export class NameAlias {
 
     isDefaultExport() {
         return this.name !== 'url' && this.name !== 'promise' && this.name !== 'value';;
+    }
+
+    isDefaultOrValue() {
+        return this.name !== 'url' && this.name !== 'promise';
     }
 
     getName() {
@@ -185,6 +190,14 @@ export class ImportSyntax {
         return this.exportNames
             .concat([this.importAll as NameAlias, this.defaultExport as NameAlias])
             .filter(alias => alias);
+    }
+
+    markType(): MarkType | undefined {
+        let mark = this.modulePath.indexOf('!');
+        if (mark > 0) {
+            // any of MarkType
+            return this.modulePath.substring(0, mark) as MarkType;
+        }
     }
 
 }

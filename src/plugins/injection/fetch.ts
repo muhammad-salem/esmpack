@@ -1,3 +1,4 @@
+import { type } from 'os';
 import { ImportSyntax } from '../../resolution/transform.js';
 
 let requestUrl: string, init: { [key: string]: any };
@@ -89,7 +90,7 @@ function fetchBase64() {
         fetch(__GetModuleDir() + requestUrl, init)
             .then(response => response.text())
             .then(text => btoa(text))
-            .then(base64 => importName = base64)
+            .then(value => importName = value)
             .then(value => resolve(value))
             .catch(reason => reject(reason));
     });
@@ -103,7 +104,7 @@ function fetchDataBase64() {
         fetch(__GetModuleDir() + requestUrl, init)
             .then(response => { type = response.type; return response.text(); })
             .then(text => `data:${type};base64,${btoa(text)}`)
-            .then(base64 => importName = base64)
+            .then(value => importName = value)
             .then(value => resolve(value))
             .catch(reason => reject(reason));
     });
@@ -174,7 +175,9 @@ export function getFetchTypeFunction(fetchType?: FetchType | MarkType): Function
     }
 }
 
-export function generateFetch(fetchType: FetchType | MarkType, url: string, importName: string = '', importURL: string = '', promiseName: string = '', init?: RequestInit) {
+export type RequestOpt = { [key: string]: any };
+
+export function generateFetch(fetchType: FetchType | MarkType, url: string, importName: string = '', importURL: string = '', promiseName: string = '', init?: RequestOpt) {
     let injectCode = getFetchTypeFunction(fetchType).toString();
     if (importName) {
         injectCode = injectCode.replace(/importName/gm, importName);
@@ -210,33 +213,20 @@ export function generateFetch(fetchType: FetchType | MarkType, url: string, impo
 }
 
 
-export function generateFetchFor(importSyntax: ImportSyntax, defaultFetchType: FetchType | MarkType, init?: RequestInit) {
-
-    let url: string, importName: string = '', importURL: string = '', promiseName: string = '';
-    let fetchType: FetchType | MarkType;
-    let mark = importSyntax.modulePath.indexOf('!');
-    if (mark > 0) {
-        // any of MarkType
-        fetchType = importSyntax.modulePath.substring(0, mark) as MarkType;
-        url = importSyntax.modulePath.substring(mark + 1);
-    } else {
-        fetchType = defaultFetchType;
-        url = importSyntax.modulePath;
-    }
-
+export function generateFetchFor(url: string, importSyntax: ImportSyntax, defaultFetchType: FetchType | MarkType, init?: RequestOpt) {
+    let importName: string, importURL: string, promiseName: string;
     let bindingNames = importSyntax.getAllExportNames();
     promiseName = bindingNames.find(bind => bind.isPromise())?.getName() || '';
     importURL = bindingNames.find(bind => bind.isURL())?.getName() || '';
-    importName = bindingNames.find(bind => bind.isValue())?.getName() || '';
-
-    return generateFetch(fetchType, url, importName, importURL, promiseName, init);
+    importName = bindingNames.find(bind => bind.isDefaultOrValue())?.getName() || '';
+    return generateFetch(importSyntax.markType() || defaultFetchType, url, importName, importURL, promiseName, init);
 }
 
-export function generateFetchAll(fetchType: FetchType | MarkType, url: string, aliasName: string, init?: RequestInit) {
+export function generateFetchAll(fetchType: FetchType | MarkType, url: string, aliasName: string, init?: RequestOpt) {
     let injectCode = getFetchTypeFunction(fetchType).toString();
 
     injectCode = injectCode.replace('let importName;', '');
-    injectCode = injectCode.replace('importName = value;', `${aliasName}.value = value`);
+    injectCode = injectCode.replace('importName = value', `${aliasName}.value = value`);
     injectCode = injectCode.replace('const importURL = ', `${aliasName}.url = `);
     injectCode = injectCode.replace('const promiseName = ', `${aliasName}.promise =`);
 
@@ -258,10 +248,10 @@ export function generateFetchAll(fetchType: FetchType | MarkType, url: string, a
     return injectCode;
 }
 
-export function generateFetchAllAndDefault(fetchType: FetchType | MarkType, url: string, aliasName: string, defaultName: string, init?: RequestInit) {
+export function generateFetchAllAndDefault(fetchType: FetchType | MarkType, url: string, aliasName: string, defaultName: string, init?: RequestOpt) {
     let injectCode = getFetchTypeFunction(fetchType).toString();
     injectCode = injectCode.replace('let importName;', `let ${defaultName};`);
-    injectCode = injectCode.replace('importName = value;', `${aliasName}.value = ${defaultName} = value`);
+    injectCode = injectCode.replace('importName = value', `${aliasName}.value = ${defaultName} = value`);
     injectCode = injectCode.replace('const importURL = ', `${aliasName}.url = `);
     injectCode = injectCode.replace('const promiseName = ', `${aliasName}.promise =`);
 

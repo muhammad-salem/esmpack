@@ -1,3 +1,4 @@
+import { type } from 'os';
 import { ImportSyntax, NameAlias } from '../resolution/transform.js';
 import { ClassInfo, ClassInfoType, TypeOf } from '../utils/class.js';
 import { FetchType, generateFetch, generateFetchAll, generateFetchAllAndDefault, generateFetchFor, MarkType } from './injection/fetch.js';
@@ -65,24 +66,20 @@ export class Plugin implements PluginInterface {
 
     constructor(protected moduleType: FetchType | MarkType) { }
 
-
-    private handelExport(importSyntax: ImportSyntax, path: string): PluginAction {
+    protected handelExport(importSyntax: ImportSyntax, path: string): PluginAction {
         throw new Error('export non js module is not supported yet');
     }
 
-    private handleImport(importSyntax: ImportSyntax, path: string): PluginAction {
+    protected handleImport(importSyntax: ImportSyntax, path: string): PluginAction {
         if (importSyntax.hasExports()) {
             let propName: false | NameAlias;
-            if (importSyntax.isImportAllOnly() && importSyntax.importAll) {
+            if (propName = importSyntax.isImportAllOnly()) {
                 /**
                  * normal import statement
                  * import * as bindingName from 'bootstrap.css';
                  */
-                if (importSyntax.importAll.hasAlias()) {
-                    return new PluginAction('fetch',
-                        generateFetchAll(this.moduleType, path,
-                            importSyntax.importAll.getName())
-                    );
+                if (propName.hasAlias()) {
+                    return new PluginAction('fetch', generateFetch(this.moduleType, path, propName.getName()));
                 } else {
                     // return new PluginAction('inject', this.inject(path));
                     throw new Error(`can't import * to js module, must provide an alias for the import binding.`);
@@ -91,7 +88,7 @@ export class Plugin implements PluginInterface {
                 /**
                  * import bootstrap from 'bootstrap.css';
                  */
-                return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
+                return new PluginAction('fetch', generateFetch(this.moduleType, path, propName.getName()));
             } else if (importSyntax.isDefaultAndImportAll() && importSyntax.importAll && importSyntax.defaultExport) {
                 /**
                  * import defaultExport, * as name from "module-name";
@@ -107,7 +104,7 @@ export class Plugin implements PluginInterface {
                 /**
                  * import defaultExport, { export1 [ , [...] ] } from "module-name";
                  */
-                return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
+                return new PluginAction('fetch', generateFetchFor(path, importSyntax, this.moduleType));
             }
             // else if (importSyntax.isExportNamesOnly()) {
             /**
@@ -117,7 +114,7 @@ export class Plugin implements PluginInterface {
              * // import { export1 , export2, export3 } from "module-name";
              * only promise and value and value
              */
-            return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
+            return new PluginAction('fetch', generateFetchFor(path, importSyntax, this.moduleType));
         } else {
             /**
              * just import file
@@ -141,11 +138,10 @@ export class Plugin implements PluginInterface {
 
 export const BuiltinPlugin = new Map<string, PluginHandler>();
 
-@ClassInfo('css', /\.css$/g, BuiltinPlugin)
-export class CSSPlugin extends Plugin {
+class CSSPlugin extends Plugin {
     constructor(moduleType: FetchType | MarkType) {
         super(moduleType);
-        let oldTransform = this.transform;
+        let oldTransform = this.transform.bind(this);
         this.transform = (importSyntax: ImportSyntax, relativeFilePath: string): PluginAction => {
             try {
                 return oldTransform(importSyntax, relativeFilePath);
@@ -153,8 +149,8 @@ export class CSSPlugin extends Plugin {
                 // inject css to dom
                 let code = generateInject('style', relativeFilePath);
                 if (importSyntax.defaultExport) {
-                    let fetch = generateFetchFor(importSyntax, this.moduleType);
-                    code += ';' + fetch;
+                    let fetch = generateFetchFor(relativeFilePath, importSyntax, this.moduleType);
+                    code += fetch;
                 }
                 return new PluginAction('inject', code);
             }
@@ -168,23 +164,20 @@ BuiltinPlugin.set('text', { regexp: /\.txt$/g, handler: new Plugin('text') });
 BuiltinPlugin.set('json', { regexp: /\.json$/g, handler: new Plugin('json') });
 
 function getRegExp(ext: string[]) {
-    let mime: string = ext.join('|');
-    return new RegExp(mime, 'g');
+    return new RegExp(`\.(${ext.join('|')})$`, 'g');
 }
-const ImageMIME = ["apng", "bmp", "gif", "ico", "cur", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "svg", "tif", "tiff", "webp"];
+const ImageMIME = ['apng', 'bmp', 'gif', 'ico', 'cur', 'jpg', 'jpeg', 'jfif', 'pjpeg', 'pjp', 'png', 'svg', 'tif', 'tiff', 'webp'];
 const AudioMIME = ['3gp', 'flac', 'mpg', 'mpeg', 'mp3', 'mp4', 'm4a', 'oga', 'ogg', 'wav', 'webm'];
 
-
-BuiltinPlugin.set('img', { regexp: getRegExp(ImageMIME), handler: new Plugin('objectURL') });
+BuiltinPlugin.set('image', { regexp: getRegExp(ImageMIME), handler: new Plugin('dataBase64') });
 BuiltinPlugin.set('audio', { regexp: getRegExp(AudioMIME), handler: new Plugin('arrayBuffer') });
 
 export function findPluginByName(name: string): PluginHandler | undefined {
     switch (name.toLowerCase()) {
-        case 'arrayBuffer': name = 'buff'; break;
         case 'style': name = 'css'; break;
         case 'htm': name = 'html'; break;
-        case 'image': name = 'img'; break;
-        case 'text': name = 'txt'; break;
+        case 'img': name = 'image'; break;
+        case 'txt': name = 'text'; break;
     }
     if (BuiltinPlugin.has(name)) {
         return BuiltinPlugin.get(name);

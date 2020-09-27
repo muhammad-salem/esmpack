@@ -1,4 +1,7 @@
-import { Plugin, PluginHandler } from '../plugins/plugin.js';
+import { type } from 'os';
+import { FetchType, MarkType } from '../plugins/injection/fetch.js';
+import { Plugin, PluginAction, PluginHandler } from '../plugins/plugin.js';
+import { ImportSyntax } from '../resolution/transform.js';
 
 /**
  * 
@@ -152,8 +155,18 @@ export interface ESMConfig {
     prod: boolean,
 }
 
+export interface ConfigPluginHandler {
+    test: RegExp;
+    moduleType: FetchType | MarkType;
+    handler?: (importSyntax: ImportSyntax, relativeFilePath: string) => PluginAction;
+}
+/**
+ * `string` for the built-in plugin
+ * `ConfigPluginHandler` for user defined plugin.
+ */
+export type ConfigPlugin = 'css' | 'html' | 'img' | 'json' | 'txt' | 'image' | 'audio' | ConfigPluginHandler;
 
-export type ConfigPlugin = string | PluginHandler | typeof Plugin;
+
 
 /**
  * @see ESMConfig documentation
