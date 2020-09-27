@@ -7,9 +7,8 @@ import {
 import { join, resolve } from 'path';
 import { exit } from 'process';
 import {
-    CSSPlugin, ESMConfig, HTMLPlugin, ImagePlugin, JSONPlugin,
-    TextPlugin, ESMTransformer, findPluginByName, JSConfig,
-    setLogLevel, LogLevel, PackageJson, getPackageIndex, logger
+    ESMConfig, ESMTransformer, findPluginByName, JSConfig,
+    setLogLevel, LogLevel, PackageJson, getPackageIndex, logger, TypeOf
 } from '../dist/index.js';
 
 
@@ -120,11 +119,11 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
     }
 
     jsConfig.plugins ??= [
-        CSSPlugin,
-        HTMLPlugin,
-        ImagePlugin,
-        JSONPlugin,
-        TextPlugin
+        'css',
+        'html',
+        'img',
+        'json',
+        'txt'
     ];
 
     let esmConfig: ESMConfig = {
@@ -140,18 +139,14 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
         prod
     };
 
-    esmConfig.plugins = jsConfig.plugins
-        .map(pluginRef => {
-            if (typeof pluginRef === 'function') {
-                let plugType = pluginRef as typeof HTMLPlugin;
-                return { regexp: pluginRef.getRegExp(), handler: new plugType() }
-            } else if (typeof pluginRef === 'object') {
-                // return findPluginByName(pluginRef.name, pluginRef.action);
-                return pluginRef;
-            } else if (typeof pluginRef === 'string') {
-                return findPluginByName(pluginRef);
-            }
-        })
+    esmConfig.plugins = jsConfig.plugins.map(pluginRef => {
+        if (typeof pluginRef === 'object') {
+            // return findPluginByName(pluginRef.name, pluginRef.action);
+            return pluginRef;
+        } else if (typeof pluginRef === 'string') {
+            return findPluginByName(pluginRef);
+        }
+    })
         .filter(plugin => plugin);
     return esmConfig;
 }
