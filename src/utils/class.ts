@@ -15,8 +15,12 @@ export interface ClassInfoType {
     getRegExp(): RegExp;
 }
 
+export interface TypeOf<T> extends Function {
+    new(...values: any): T;
+}
+
 export function ClassInfo(pluginName: string, regexp: RegExp, map?: Map<string, { regexp: RegExp, handler: any }>): Function {
-    return (target: Function & ClassInfoType & { new(...paramter: any[]): ClassInfoType; }): Function => {
+    return (target: Function & ClassInfoType & TypeOf<ClassInfoType>): Function => {
         target.getName = () => pluginName;
         target.getRegExp = () => regexp;
         if (map) {
