@@ -169,7 +169,7 @@ function getRegExp(ext: string[]) {
 const ImageMIME = ['apng', 'bmp', 'gif', 'ico', 'cur', 'jpg', 'jpeg', 'jfif', 'pjpeg', 'pjp', 'png', 'svg', 'tif', 'tiff', 'webp'];
 const AudioMIME = ['3gp', 'flac', 'mpg', 'mpeg', 'mp3', 'mp4', 'm4a', 'oga', 'ogg', 'wav', 'webm'];
 
-BuiltinPlugin.set('image', { regexp: getRegExp(ImageMIME), handler: new Plugin('dataBase64') });
+BuiltinPlugin.set('image', { regexp: getRegExp(ImageMIME), handler: new Plugin('objectURL') });
 BuiltinPlugin.set('audio', { regexp: getRegExp(AudioMIME), handler: new Plugin('arrayBuffer') });
 
 export function findPluginByName(name: string): PluginHandler | undefined {
