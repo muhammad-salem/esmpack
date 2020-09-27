@@ -195,7 +195,6 @@ export function generateFetch(fetchType: FetchType | MarkType, url: string, impo
     }
 
     injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
-    injectCode = injectCode.replace(/bodyType/gm, JSON.stringify(fetchType));
     if (init) {
         injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
     } else {
@@ -228,7 +227,58 @@ export function generateFetchFor(importSyntax: ImportSyntax, defaultFetchType: F
     let bindingNames = importSyntax.getAllExportNames();
     promiseName = bindingNames.find(bind => bind.isPromise())?.getName() || '';
     importURL = bindingNames.find(bind => bind.isURL())?.getName() || '';
-    importName = bindingNames.find(bind => bind.isModuleName())?.getName() || '';
+    importName = bindingNames.find(bind => bind.isValue())?.getName() || '';
 
     return generateFetch(fetchType, url, importName, importURL, promiseName, init);
+}
+
+export function generateFetchAll(fetchType: FetchType | MarkType, url: string, aliasName: string, init?: RequestInit) {
+    let injectCode = getFetchTypeFunction(fetchType).toString();
+
+    injectCode = injectCode.replace('let importName;', '');
+    injectCode = injectCode.replace('importName = value;', `${aliasName}.value = value`);
+    injectCode = injectCode.replace('const importURL = ', `${aliasName}.url = `);
+    injectCode = injectCode.replace('const promiseName = ', `${aliasName}.promise =`);
+
+    injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
+    if (init) {
+        injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
+    } else {
+        injectCode = injectCode.replace(/, init/gm, '');
+    }
+    // let intent = 0;
+    injectCode = injectCode.split('\n')
+        .filter((value, index, arr) => index > 0 && index < arr.length - 1)
+        .map(value => value.trim())
+        .filter(value => value)
+        .join('');
+
+
+    injectCode = `const ${aliasName} = {}; (() => {${injectCode}})()`;
+    return injectCode;
+}
+
+export function generateFetchAllAndDefault(fetchType: FetchType | MarkType, url: string, aliasName: string, defaultName: string, init?: RequestInit) {
+    let injectCode = getFetchTypeFunction(fetchType).toString();
+    injectCode = injectCode.replace('let importName;', `let ${defaultName};`);
+    injectCode = injectCode.replace('importName = value;', `${aliasName}.value = ${defaultName} = value`);
+    injectCode = injectCode.replace('const importURL = ', `${aliasName}.url = `);
+    injectCode = injectCode.replace('const promiseName = ', `${aliasName}.promise =`);
+
+    injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
+    if (init) {
+        injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
+    } else {
+        injectCode = injectCode.replace(/, init/gm, '');
+    }
+    // let intent = 0;
+    injectCode = injectCode.split('\n')
+        .filter((value, index, arr) => index > 0 && index < arr.length - 1)
+        .map(value => value.trim())
+        .filter(value => value)
+        .join('');
+
+
+    injectCode = `const ${aliasName} = {}; (() => {${injectCode}})()`;
+    return injectCode;
 }
