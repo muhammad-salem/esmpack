@@ -3,7 +3,6 @@ import { ImportSyntax, NameAlias } from '../resolution/transform.js';
 import { ClassInfo } from '../utils/class.js';
 import { generateFetch } from './injection/fetch.js';
 import { generateInject } from './injection/inject.js';
-import { generateFetchWithPromise } from './injection/promise.js';
 
 /**
  * for now, the output of an Plugin will be static import statement.
@@ -65,7 +64,7 @@ export abstract class Plugin {
 
     private handelFetch(url: string, nameAlias: NameAlias) {
         if (nameAlias.isPromise()) {
-            return new PluginResult('fetch', this.fetchWithPromise(url, nameAlias.alias || nameAlias.name));
+            return new PluginResult('fetch', this.fetch(url, nameAlias.alias || nameAlias.name));
         }
         return new PluginResult('fetch', this.fetch(url, nameAlias.alias || nameAlias.name));
     }
@@ -73,9 +72,9 @@ export abstract class Plugin {
     private handelFetchWithPromise(url: string, name1: NameAlias, name2?: NameAlias): PluginResult {
         if (name2) {
             if (name1.isPromise()) {
-                return new PluginResult('fetch', this.fetchWithPromise(url, name1.getName(), name2.getName()));
+                return new PluginResult('fetch', this.fetch(url, name1.getName(), name2.getName()));
             } if (name2.isPromise()) {
-                return new PluginResult('fetch', this.fetchWithPromise(url, name2.getName(), name1.getName()));
+                return new PluginResult('fetch', this.fetch(url, name2.getName(), name1.getName()));
             }
         }
         return this.handelFetch(url, name1);
@@ -83,16 +82,6 @@ export abstract class Plugin {
 
     private handelExport(importSyntax: ImportSyntax, path: string): PluginResult {
         throw new Error('export non js module is not supported yet');
-        // let exportNames = this.getModuleExportNames();
-        // if (importSyntax.hasExports()) {
-        //     if (importSyntax.isImportAllOnly()) {
-        //     } else if (importSyntax.isDefaultExportOnly()) {
-        //     } else if (importSyntax.isExportNamesOnly()) {
-        //     } else if (importSyntax.isDefaultAndImportAll()) {
-        //     } else if (importSyntax.isExportNamesAndDefault()) {
-        //     } else {
-        //     }
-        // }
     }
 
     private handleImport(importSyntax: ImportSyntax, path: string): PluginResult {
@@ -154,7 +143,7 @@ export abstract class Plugin {
 
     abstract inject(url: string): string;
     abstract fetch(url: string, importName: string): string;
-    abstract fetchWithPromise(url: string, promiseName: string, importName?: string): string;
+    abstract fetch(url: string, promiseName: string, importName?: string): string;
 }
 
 export type PluginHandler = { regexp: RegExp; handler: Plugin; };
@@ -176,10 +165,10 @@ export class CSSPlugin extends Plugin {
         return generateInject('style', url);
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('text', importName, url);
+        return generateFetch('text', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('text', promiseName, url, importName);
+        return generateFetch('text', url, importName, promiseName);
     }
 }
 
@@ -198,10 +187,10 @@ export class HTMLPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('text', importName, url);
+        return generateFetch('text', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('text', promiseName, url, importName);
+        return generateFetch('text', url, importName, promiseName);
     }
 }
 
@@ -219,10 +208,10 @@ export class TextPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('text', importName, url);
+        return generateFetch('text', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('text', promiseName, url, importName);
+        return generateFetch('text', url, importName, promiseName);
     }
 }
 
@@ -241,10 +230,10 @@ export class JSONPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('json', importName, url);
+        return generateFetch('json', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('json', promiseName, url, importName);
+        return generateFetch('json', url, importName, promiseName);
     }
 }
 
@@ -287,10 +276,10 @@ export class ImagePlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('image', importName, url);
+        return generateFetch('objectURL', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('image', promiseName, url, importName);
+        return generateFetch('objectURL', url, importName, promiseName);
     }
 }
 
@@ -325,10 +314,11 @@ export class AudioPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('blob', importName, url);
+        return generateFetch('arrayBuffer', url, importName);
+
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('blob', promiseName, url, importName);
+        return generateFetch('arrayBuffer', url, importName, promiseName);
     }
 }
 
@@ -346,10 +336,10 @@ export class FormDataPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('formData', importName, url);
+        return generateFetch('formData', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('formData', promiseName, url, importName);
+        return generateFetch('formData', url, importName, promiseName);
     }
 }
 
@@ -367,10 +357,11 @@ export class BlobPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('blob', importName, url);
+        return generateFetch('blob', url, importName);
+
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('blob', promiseName, url, importName);
+        return generateFetch('blob', url, importName, promiseName);
     }
 }
 
@@ -388,10 +379,10 @@ export class ArrayBufferPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('buff', importName, url);
+        return generateFetch('arrayBuffer', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('buff', promiseName, url, importName);
+        return generateFetch('arrayBuffer', url, importName, promiseName);
     }
 }
 
@@ -409,10 +400,10 @@ export class BufPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('buf', importName, url);
+        return generateFetch('uint8', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('buf', promiseName, url, importName);
+        return generateFetch('uint8', url, importName, promiseName);
     }
 }
 
@@ -430,10 +421,10 @@ export class B64Plugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('b64', importName, url);
+        return generateFetch('base64', url, importName);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('b64', promiseName, url, importName);
+        return generateFetch('base64', url, importName, promiseName);
     }
 }
 
