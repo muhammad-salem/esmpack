@@ -1,4 +1,3 @@
-import { CSSPlugin, HTMLPlugin, ImagePlugin, JSONPlugin, TextPlugin } from '@aurorats/esmpack';
 export const config = {
     moduleResolution: 'relative',
     outDir: 'build/mjs/',
@@ -14,11 +13,15 @@ export const config = {
         exclude: ['./src/**/*.{js,ts,tsx}']
     },
     plugins: [
-        CSSPlugin,
-        JSONPlugin,
-        ImagePlugin,
-        HTMLPlugin,
-        TextPlugin
+        'css',
+        'html',
+        'image',
+        'json',
+        'txt',
+        {
+            regexp: /\.pdf/g,
+            handler: {}
+        }
     ]
 };
 export default config;
