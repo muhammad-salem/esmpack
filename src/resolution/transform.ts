@@ -22,8 +22,12 @@ export class NameAlias {
         return this.name === 'url';
     }
 
-    isModuleName() {
-        return this.name !== 'url' && this.name !== 'promise';
+    isValue() {
+        return this.name === 'value';
+    }
+
+    isDefaultExport() {
+        return this.name !== 'url' && this.name !== 'promise' && this.name !== 'value';;
     }
 
     getName() {
