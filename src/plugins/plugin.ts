@@ -1,7 +1,6 @@
-
 import { ImportSyntax, NameAlias } from '../resolution/transform.js';
-import { ClassInfo } from '../utils/class.js';
-import { generateFetch } from './injection/fetch.js';
+import { ClassInfo, ClassInfoType, TypeOf } from '../utils/class.js';
+import { FetchType, generateFetch, generateFetchAll, generateFetchAllAndDefault, generateFetchFor, MarkType } from './injection/fetch.js';
 import { generateInject } from './injection/inject.js';
 
 /**
@@ -46,71 +45,69 @@ import { generateInject } from './injection/inject.js';
  * export default value;
  * ```
  */
-export type PluginAction = 'inject' | 'fetch' | 'module';
+export type PluginActionType = 'inject' | 'fetch' | 'module';
 
-export class PluginResult {
-    constructor(public action: PluginAction, public inline: string = '') { }
+export class PluginAction {
+    constructor(public action: PluginActionType, public inline: string = '') { }
 }
 
-export interface ImportSyntaxNames {
-    exportNames: string[];
-    promiseName: string;
-    defaultExport: string;
+export type PluginHandler = { regexp: RegExp; handler: Plugin; };
+
+
+export interface PluginInterface {
+    transform(importSyntax: ImportSyntax, relativeFilePath: string): PluginAction;
 }
 
-export abstract class Plugin {
-    static getName(): string { return ''; };
-    static getRegExp(): RegExp { return new RegExp(''); }
+export type PluginType = TypeOf<PluginInterface> & ClassInfoType;
 
-    private handelFetch(url: string, nameAlias: NameAlias) {
-        if (nameAlias.isPromise()) {
-            return new PluginResult('fetch', this.fetch(url, nameAlias.alias || nameAlias.name));
-        }
-        return new PluginResult('fetch', this.fetch(url, nameAlias.alias || nameAlias.name));
-    }
 
-    private handelFetchWithPromise(url: string, name1: NameAlias, name2?: NameAlias): PluginResult {
-        if (name2) {
-            if (name1.isPromise()) {
-                return new PluginResult('fetch', this.fetch(url, name1.getName(), name2.getName()));
-            } if (name2.isPromise()) {
-                return new PluginResult('fetch', this.fetch(url, name2.getName(), name1.getName()));
-            }
-        }
-        return this.handelFetch(url, name1);
-    }
+export class Plugin implements PluginInterface {
 
-    private handelExport(importSyntax: ImportSyntax, path: string): PluginResult {
+    constructor(protected moduleType: FetchType | MarkType) { }
+
+
+    private handelExport(importSyntax: ImportSyntax, path: string): PluginAction {
         throw new Error('export non js module is not supported yet');
     }
 
-    private handleImport(importSyntax: ImportSyntax, path: string): PluginResult {
+    private handleImport(importSyntax: ImportSyntax, path: string): PluginAction {
         if (importSyntax.hasExports()) {
             let propName: false | NameAlias;
-            if (importSyntax.isImportAllOnly()) {
+            if (importSyntax.isImportAllOnly() && importSyntax.importAll) {
                 /**
                  * normal import statement
-                 * import * from 'bootstrap.css';
+                 * import * as bindingName from 'bootstrap.css';
                  */
-                return new PluginResult('inject', this.inject(path));
+                if (importSyntax.importAll.hasAlias()) {
+                    return new PluginAction('fetch',
+                        generateFetchAll(this.moduleType, path,
+                            importSyntax.importAll.getName())
+                    );
+                } else {
+                    // return new PluginAction('inject', this.inject(path));
+                    throw new Error(`can't import * to js module, must provide an alias for the import binding.`);
+                }
             } else if (propName = importSyntax.isDefaultExportOnly()) {
                 /**
                  * import bootstrap from 'bootstrap.css';
                  */
-                return new PluginResult('fetch', this.fetch(path, propName.getName()));
-            } else if (importSyntax.isDefaultAndImportAll()) {
+                return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
+            } else if (importSyntax.isDefaultAndImportAll() && importSyntax.importAll && importSyntax.defaultExport) {
                 /**
                  * import defaultExport, * as name from "module-name";
                  */
-                let names = this.getModuleExportNames();
-                return this.handelFetchWithPromise(path, new NameAlias('promise', names.promiseName), new NameAlias('value', names.defaultExport));
+                if (importSyntax.importAll.hasAlias()) {
+                    let code = generateFetchAllAndDefault(this.moduleType, path,
+                        importSyntax.importAll.getName(), importSyntax.defaultExport.getName());
+                    return new PluginAction('fetch', code);
+                } else {
+                    throw new Error(`can't import * to js module, must provide an alias for the import binding.`);
+                }
             } else if (importSyntax.isExportNamesAndDefault()) {
                 /**
                  * import defaultExport, { export1 [ , [...] ] } from "module-name";
                  */
-                return this.handelFetchWithPromise(path,
-                    importSyntax.defaultExport as NameAlias,
-                    importSyntax.exportNames[0]);
+                return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
             }
             // else if (importSyntax.isExportNamesOnly()) {
             /**
@@ -118,315 +115,68 @@ export abstract class Plugin {
              * import { export1 as alias1 } from "module-name";
              * import { export1 , export2 } from "module-name";
              * // import { export1 , export2, export3 } from "module-name";
-             * only promise and value
+             * only promise and value and value
              */
-            return this.handelFetchWithPromise(path, importSyntax.exportNames[0], importSyntax.exportNames[1]);
-            // } 
+            return new PluginAction('fetch', generateFetchFor(importSyntax, this.moduleType));
         } else {
             /**
              * just import file
              * inject to document
              * import 'bootstrap.css';
              */
-            return new PluginResult('inject', this.inject(path));
+            throw new Error(`can't import * to js module, must provide an alias for the import binding.`);
         }
     }
-    transform(importSyntax: ImportSyntax, path: string): PluginResult {
+
+    transform(importSyntax: ImportSyntax, relativeFilePath: string): PluginAction {
         if (importSyntax.syntaxType.isExport()) {
-            return this.handelExport(importSyntax, path);
+            return this.handelExport(importSyntax, relativeFilePath);
         } else {
-            return this.handleImport(importSyntax, path);
+            return this.handleImport(importSyntax, relativeFilePath);
         }
     }
 
-    abstract getModuleExportNames(url?: string): ImportSyntaxNames;
-
-    abstract inject(url: string): string;
-    abstract fetch(url: string, importName: string): string;
-    abstract fetch(url: string, promiseName: string, importName?: string): string;
 }
 
-export type PluginHandler = { regexp: RegExp; handler: Plugin; };
 
 export const BuiltinPlugin = new Map<string, PluginHandler>();
 
 @ClassInfo('css', /\.css$/g, BuiltinPlugin)
 export class CSSPlugin extends Plugin {
-
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['css', 'style']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        return generateInject('style', url);
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('text', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('text', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('html', /\.html?$/g, BuiltinPlugin)
-export class HTMLPlugin extends Plugin {
-
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['html']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('text', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('text', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('text', /\.txt$/g, BuiltinPlugin)
-export class TextPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['text', 'txt']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('text', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('text', url, importName, promiseName);
-    }
-}
-
-
-@ClassInfo('json', /\.json$/g, BuiltinPlugin)
-export class JSONPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['json']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('json', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('json', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('img', ImagePlugin.getRegExp(), BuiltinPlugin)
-export class ImagePlugin extends Plugin {
-    static MimeType: { [key: string]: string[] } = {
-        'image/apng': ['apng'],
-        'image/bmp': ['bmp'],
-        'image/gif': ['gif'],
-        'image/x-icon': ['ico', 'cur'],
-        'image/jpeg': ['jpg', 'jpeg', 'jfif', 'pjpeg', 'pjp'],
-        'image/png': ['png'],
-        'image/svg+xml': ['svg'],
-        'image/tiff': ['tif', 'tiff'],
-        'image/webp': ['webp']
-    };
-
-    static getMediaType(ext: string): string | undefined {
-        for (const key in ImagePlugin.MimeType) {
-            if (ImagePlugin.MimeType[key].includes(ext)) {
-                return key;
+    constructor(moduleType: FetchType | MarkType) {
+        super(moduleType);
+        let oldTransform = this.transform;
+        this.transform = (importSyntax: ImportSyntax, relativeFilePath: string): PluginAction => {
+            try {
+                return oldTransform(importSyntax, relativeFilePath);
+            } catch (e) {
+                // inject css to dom
+                let code = generateInject('style', relativeFilePath);
+                if (importSyntax.defaultExport) {
+                    let fetch = generateFetchFor(importSyntax, this.moduleType);
+                    code += ';' + fetch;
+                }
+                return new PluginAction('inject', code);
             }
-        }
-    }
-
-    static getRegExp() {
-        let mime: string = Object.keys(ImagePlugin.MimeType)
-            .map(key => ImagePlugin.MimeType[key].join('|'))
-            .join('|');
-        return new RegExp(mime, 'g');
-    }
-    getModuleExportNames(url: string): ImportSyntaxNames {
-        return {
-            defaultExport: 'value',
-            promiseName: 'promise',
-            exportNames: [url.substring(url.lastIndexOf('.'))]
         };
     }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('objectURL', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('objectURL', url, importName, promiseName);
-    }
 }
 
-@ClassInfo('audio', AudioPlugin.getRegExp(), BuiltinPlugin)
-export class AudioPlugin extends Plugin {
-    static MIME = [
-        '3gp',
-        'flac',
-        'mpg',
-        'mpeg',
-        'mp3',
-        'mp4',
-        'm4a',
-        'oga',
-        'ogg',
-        'wav',
-        'webm'
-    ];
+BuiltinPlugin.set('css', { regexp: /\.css$/g, handler: new CSSPlugin('text') });
+BuiltinPlugin.set('html', { regexp: /\.html?$/g, handler: new Plugin('text') });
+BuiltinPlugin.set('text', { regexp: /\.txt$/g, handler: new Plugin('text') });
+BuiltinPlugin.set('json', { regexp: /\.json$/g, handler: new Plugin('json') });
 
-    static getRegExp() {
-        let mime: string = AudioPlugin.MIME.join('|');
-        return new RegExp(mime, 'g');
-    }
-    getModuleExportNames(url: string): ImportSyntaxNames {
-        return {
-            defaultExport: 'value',
-            promiseName: 'promise',
-            exportNames: [url.substring(url.lastIndexOf('.'))]
-        };
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('arrayBuffer', url, importName);
-
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('arrayBuffer', url, importName, promiseName);
-    }
+function getRegExp(ext: string[]) {
+    let mime: string = ext.join('|');
+    return new RegExp(mime, 'g');
 }
+const ImageMIME = ["apng", "bmp", "gif", "ico", "cur", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "svg", "tif", "tiff", "webp"];
+const AudioMIME = ['3gp', 'flac', 'mpg', 'mpeg', 'mp3', 'mp4', 'm4a', 'oga', 'ogg', 'wav', 'webm'];
 
-@ClassInfo('formData', /\.formData$/g, BuiltinPlugin)
-export class FormDataPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['formData']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('formData', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('formData', url, importName, promiseName);
-    }
-}
 
-@ClassInfo('blob', /\.blob$/g, BuiltinPlugin)
-export class BlobPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['blob']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('blob', url, importName);
-
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('blob', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('buff', /\.buff$/g, BuiltinPlugin)
-export class ArrayBufferPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['buff']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('arrayBuffer', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('arrayBuffer', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('buf', /\.buf$/g, BuiltinPlugin)
-export class BufPlugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['buf']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('uint8', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('uint8', url, importName, promiseName);
-    }
-}
-
-@ClassInfo('b64', /\.b64$/g, BuiltinPlugin)
-export class B64Plugin extends Plugin {
-    defaultNames: ImportSyntaxNames = {
-        defaultExport: 'value',
-        promiseName: 'promise',
-        exportNames: ['b64']
-    };
-    getModuleExportNames(): ImportSyntaxNames {
-        return this.defaultNames;
-    }
-    inject(url: string): string {
-        throw new Error('Method not implemented.');
-    }
-    fetch(url: string, importName: string): string {
-        return generateFetch('base64', url, importName);
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetch('base64', url, importName, promiseName);
-    }
-}
+BuiltinPlugin.set('img', { regexp: getRegExp(ImageMIME), handler: new Plugin('objectURL') });
+BuiltinPlugin.set('audio', { regexp: getRegExp(AudioMIME), handler: new Plugin('arrayBuffer') });
 
 export function findPluginByName(name: string): PluginHandler | undefined {
     switch (name.toLowerCase()) {
