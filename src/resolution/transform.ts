@@ -1,6 +1,5 @@
 import { resolve } from 'path';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
-import { logger } from '../logger/logger.js';
 import { trackPackage } from '../utils/utils.js';
 
 
@@ -17,6 +16,14 @@ export class NameAlias {
 
     isPromise() {
         return this.name === 'promise';
+    }
+
+    isURL() {
+        return this.name === 'url';
+    }
+
+    isModuleName() {
+        return this.name !== 'url' && this.name !== 'promise';
     }
 
     getName() {
@@ -168,6 +175,12 @@ export class ImportSyntax {
 
     isExportNamesAndDefault() {
         return !this.importAll && this.defaultExport && (this.exportNames.length > 0);
+    }
+
+    getAllExportNames() {
+        return this.exportNames
+            .concat([this.importAll as NameAlias, this.defaultExport as NameAlias])
+            .filter(alias => alias);
     }
 
 }

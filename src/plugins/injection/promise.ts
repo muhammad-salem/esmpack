@@ -99,19 +99,26 @@ function fetchImageWithPromise() {
             .catch(reason => reject(reason));
     });
 }
-async function fetchAudioWithPromise() {
+
+
+type AudioType = { src: AudioBufferSourceNode, ctx: AudioContext, buff: ArrayBuffer };
+
+function fetchAudioWithPromise() {
     let importName: AudioBufferSourceNode;
-    const promiseName: Promise<string> = new Promise<string>((resolve, reject) => {
+    const promiseName: Promise<AudioType> = new Promise<AudioType>((resolve, reject) => {
         let audioCtx = new AudioContext();
         importName = audioCtx.createBufferSource();
+        let buff: ArrayBuffer;
         fetch(__GetModuleDir() + requestUrl, init)
             .then(response => response.arrayBuffer())
             .then(buffer => {
+                buff = buffer;
                 audioCtx.decodeAudioData(buffer, decodedData => {
                     importName.buffer = decodedData;
                     importName.connect(audioCtx.destination);
                 });
             })
+            .then(() => resolve({ src: importName, ctx: audioCtx, buff: buff }))
             .catch(reason => reject(reason));
     });
 }

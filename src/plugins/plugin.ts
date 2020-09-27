@@ -325,10 +325,10 @@ export class AudioPlugin extends Plugin {
         throw new Error('Method not implemented.');
     }
     fetch(url: string, importName: string): string {
-        return generateFetch('audio', importName, url);
+        return generateFetch('blob', importName, url);
     }
     fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        return generateFetchWithPromise('audio', promiseName, url, importName);
+        return generateFetchWithPromise('blob', promiseName, url, importName);
     }
 }
 
