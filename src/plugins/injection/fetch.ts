@@ -9,6 +9,9 @@ function __GetModuleDir() {
     return __moduleDir__;
 }
 
+function defineUrlOnly() {
+    const importURL: string = __GetModuleDir() + requestUrl;
+}
 function fetchText() {
     let importName: string;
     const importURL: string = __GetModuleDir() + requestUrl;
@@ -178,7 +181,12 @@ export function getFetchTypeFunction(fetchType?: FetchType | MarkType): Function
 export type RequestOpt = { [key: string]: any };
 
 export function generateFetch(fetchType: FetchType | MarkType, url: string, importName: string = '', importURL: string = '', promiseName: string = '', init?: RequestOpt) {
-    let injectCode = getFetchTypeFunction(fetchType).toString();
+    let injectCode: string;
+    if (importURL && !importName && !promiseName) {
+        injectCode = defineUrlOnly.toString();
+    } else {
+        injectCode = getFetchTypeFunction(fetchType).toString();
+    }
     if (importName) {
         injectCode = injectCode.replace(/importName/gm, importName);
     } else {
@@ -198,12 +206,11 @@ export function generateFetch(fetchType: FetchType | MarkType, url: string, impo
     }
 
     injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
-    if (init) {
-        injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
-    } else {
-        injectCode = injectCode.replace(/, init/gm, '');
+    if (!init) {
+        init = { cache: 'force-cache' };
     }
-    // let intent = 0;
+    injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
+    // injectCode = injectCode.replace(/, init/gm, '');
     injectCode = injectCode.split('\n')
         .filter((value, index, arr) => index > 0 && index < arr.length - 1)
         .map(value => value.trim())
@@ -231,12 +238,11 @@ export function generateFetchAll(fetchType: FetchType | MarkType, url: string, a
     injectCode = injectCode.replace('const promiseName = ', `${aliasName}.promise =`);
 
     injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
-    if (init) {
-        injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
-    } else {
-        injectCode = injectCode.replace(/, init/gm, '');
+    injectCode = injectCode.replace(/requestUrl/gm, JSON.stringify(url));
+    if (!init) {
+        init = { cache: 'force-cache' };
     }
-    // let intent = 0;
+    injectCode = injectCode.replace(/init/gm, JSON.stringify(init));
     injectCode = injectCode.split('\n')
         .filter((value, index, arr) => index > 0 && index < arr.length - 1)
         .map(value => value.trim())
@@ -261,7 +267,6 @@ export function generateFetchAllAndDefault(fetchType: FetchType | MarkType, url:
     } else {
         injectCode = injectCode.replace(/, init/gm, '');
     }
-    // let intent = 0;
     injectCode = injectCode.split('\n')
         .filter((value, index, arr) => index > 0 && index < arr.length - 1)
         .map(value => value.trim())
