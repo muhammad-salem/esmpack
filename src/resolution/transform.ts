@@ -100,6 +100,12 @@ export class ImportSyntax {
      */
     exportNames: NameAlias[] = [];
 
+    /**
+     * path marker `import image from 'dataBase64!./resources/image.png';`
+     * the marker will be `dataBase64`.
+     */
+    marker: MarkType = '' as MarkType;
+
     constructor(match: RegExpExecArray) {
         this.init(match);
     }
@@ -140,11 +146,16 @@ export class ImportSyntax {
         let temp = objectNames.split(',');
         this.exportNames = temp.map(str => this.getNameAndAlias(str));
     }
-
     private init(match: RegExpExecArray) {
         this.statement = match[0];
         this.syntaxType = new SyntaxType(match[1] as SyntaxTypeRef);
         this.modulePath = match[3].substring(1, match[3].length - 1);
+        let mark = this.modulePath.indexOf('!');
+        if (mark > 0) {
+            // MarkType
+            this.marker = this.modulePath.substring(0, mark) as MarkType;
+            this.modulePath = this.modulePath.substring(mark + 1);
+        }
         if (!match[2]) {
             return;
         }
@@ -193,13 +204,16 @@ export class ImportSyntax {
     }
 
     markType(): MarkType | undefined {
-        let mark = this.modulePath.indexOf('!');
-        if (mark > 0) {
-            // any of MarkType
-            return this.modulePath.substring(0, mark) as MarkType;
-        }
+        return this.marker;
     }
 
+    toDefaultModuleStatementString(ext: string): string {
+        let defaultName: string = '';
+        if (this.defaultExport) {
+            defaultName = this.defaultExport.getName();
+        }
+        return `${this.syntaxType.syntaxType} ${defaultName} from '${this.modulePath + ext}';`;
+    }
 }
 
 /**
