@@ -46,7 +46,7 @@ import { generateInject } from './injection/inject.js';
  * export default value;
  * ```
  */
-export type PluginActionType = 'inject' | 'fetch' | 'module';
+export type PluginActionType = 'replace' | 'fetch' | 'module';
 
 export class PluginAction {
     constructor(public action: PluginActionType, public inline: string = '') { }
@@ -152,7 +152,7 @@ class CSSPlugin extends Plugin {
                     let fetch = generateFetchFor(relativeFilePath, importSyntax, this.moduleType);
                     code += fetch;
                 }
-                return new PluginAction('inject', code);
+                return new PluginAction('replace', code);
             }
         };
     }
