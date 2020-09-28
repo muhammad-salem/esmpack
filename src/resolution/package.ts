@@ -43,7 +43,7 @@ export class TransformerHandler {
         let content = readFileSync(input, 'utf8').toString();
         const srcDir = resolve(input, '..');
         const outDir = resolve(output, '..');
-        let inputExt = getFileExtension(input) || '';
+        let inputExt = this.config.extension || getFileExtension(input) || '.js';
         mkdirSyncIfNotExists(outDir);
 
         let searchContent = this.removeComments(content);
@@ -52,36 +52,28 @@ export class TransformerHandler {
 
         let allMatch = ImportSyntax.getImportSyntax(searchContent);
 
-        allMatch.forEach(match => {
-            let ext = matchFileExtension(match.modulePath);
+        allMatch.forEach(importSyntax => {
+            let ext = matchFileExtension(importSyntax.modulePath);
             if (ext && ! /m?js/g.test(ext[1])) {
                 // plugin scope
-                let plugin = this.searchPlugin(match.modulePath, opt.plugins);
+                let plugin = this.searchPlugin(importSyntax.modulePath, opt.plugins);
                 if (!plugin) {
-                    console.error(`can't find module for file extension '${ext[1]}'`, match.statement);
+                    console.error(`can't find module for file extension '${ext[1]}'`, importSyntax.statement);
                     return;
                 }
                 let filePath: string, outPath: string;
-                let modulePath: string;
-                let mark = match.modulePath.indexOf('!');
-                if (mark > 0) {
-                    // any of MarkType
-                    modulePath = match.modulePath.substring(mark + 1);
-                } else {
-                    modulePath = match.modulePath;
-                }
-                if (/^\./.test(modulePath)) {
+                if (/^\./.test(importSyntax.modulePath)) {
                     // workspace resources
-                    outPath = resolve(outDir, modulePath);
-                    filePath = resolve(srcDir, modulePath);
+                    outPath = resolve(outDir, importSyntax.modulePath);
+                    filePath = resolve(srcDir, importSyntax.modulePath);
                     if (!existsSync(filePath)) {
                         // try to resolve from resources
                         return;
                     }
                 } else {
-                    let pkgTrack = trackPackage(modulePath, opt.nodeModulePath);
+                    let pkgTrack = trackPackage(importSyntax.modulePath, opt.nodeModulePath);
                     if (!pkgTrack) {
-                        console.error(`can't find node package resources for '${modulePath}'`);
+                        console.error(`can't find node package resources for '${importSyntax.modulePath}'`);
                         return;
                     }
                     let pkgInfo: PackageInfo;
@@ -105,25 +97,27 @@ export class TransformerHandler {
                 // let result = plugin.handler.transform(match, staticFilePath);
                 let relativeFilePath = relative(outDir, outPath);
                 injectModuleInfo = true;
-                let result = plugin.handler.transform(match, relativeFilePath);
-                content = content.replace(match.statement, result.inline);
-
-                if (result.action === 'module') {
-                    let buffer = readFileSync(filePath);
-                    let resModuleContent = `export default ${JSON.stringify(buffer.toString())};`;
-                    if (inputExt) {
-                        outPath += '.' + inputExt;
-                    }
-                    mkdirSyncIfNotExists(resolve('outPath', '..'));
-                    writeFileSync(outPath, resModuleContent);
-                } else {
+                let result = plugin.handler.transform(importSyntax, relativeFilePath);
+                if (result.action === 'replace') {
+                    content = content.replace(importSyntax.statement, result.inline);
+                } else if (result.action === 'fetch') {
+                    content = content.replace(importSyntax.statement, result.inline);
                     mkdirSyncIfNotExists(resolve(outPath, '..'));
                     copyFileSync(filePath, outPath);
+                } else {
+                    /**result.action === 'module'**/
+                    let statement = importSyntax.toDefaultModuleStatementString(inputExt);
+                    content = content.replace(importSyntax.statement, statement);
+                    let buffer = readFileSync(filePath);
+                    let resModuleContent = `export default ${JSON.stringify(buffer.toString())};`;
+                    outPath += '.' + inputExt;
+                    mkdirSyncIfNotExists(resolve('outPath', '..'));
+                    writeFileSync(outPath, resModuleContent);
                 }
             } else {
 
                 // js module scop
-                let result = opt.jsTransformer.transform(match, {
+                let result = opt.jsTransformer.transform(importSyntax, {
                     buildDir: opt.packageInfo.out,
                     currentJsPath: output,
                     nodeModulePath: opt.nodeModulePath,
@@ -135,7 +129,7 @@ export class TransformerHandler {
                         content,
                         followImport,
                         result,
-                        match,
+                        match: importSyntax,
                         helperOptions: opt,
                         srcDir,
                         outDir
