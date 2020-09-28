@@ -117,12 +117,15 @@ function fetchObjectURL() {
     let importName: string;
     const importURL: string = __GetModuleDir() + requestUrl;
     const promiseName: Promise<string> = new Promise<string>((resolve, reject) => {
+        let objectURL: string;
         fetch(__GetModuleDir() + requestUrl, init)
             .then(response => response.blob())
             .then(blob => URL.createObjectURL(blob))
             .then(value => importName = value)
+            .then(value => objectURL = value)
             .then(value => resolve(value))
             .catch(reason => reject(reason));
+        window.addEventListener('unload', () => { URL.revokeObjectURL(objectURL); });
     });
 }
 
