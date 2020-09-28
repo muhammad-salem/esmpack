@@ -22,12 +22,12 @@ Version 0.1.4
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
-'esmpack.js', 'esmpack.mjs' and 'esmpack.json'.
+'esmpack.config.js', 'esmpack.config.mjs' and 'esmpack.config.json'.
 
 Examples:
     esmpack
-    esmpack esmpack.js
-    esmpack esmpack.json -w -d
+    esmpack esmpack.config.js.js
+    esmpack esmpack.config.json -w -d
     esmpack -v
     esmpack --help
 
@@ -166,9 +166,9 @@ function isFound(path: string) {
 
 if (!configPath) {
     // search for js module as config
-    configPath = isFound(resolve(process.cwd(), 'esmpack.js'))
-        || isFound(resolve(process.cwd(), 'esmpack.mjs'))
-        || isFound(resolve(process.cwd(), 'esmpack.json'));
+    configPath = isFound(resolve(process.cwd(), 'esmpack.config.js'))
+        || isFound(resolve(process.cwd(), 'esmpack.config.mjs'))
+        || isFound(resolve(process.cwd(), 'esmpack.config.json'));
     // || isFound(resolve(process.cwd(), 'package.json'));
     if (isFound(configPath)) {
         if (debug || !silent) {
