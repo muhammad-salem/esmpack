@@ -1,4 +1,5 @@
 import { resolve } from 'path';
+import chokidar from 'chokidar';
 import { JSTransformer } from '../resolution/transform.js';
 import { isFile, mkdirSyncIfNotExists, trackNodeModulePath, trackPackage } from '../utils/utils.js';
 import { ESMConfig } from './config.js';
@@ -6,7 +7,7 @@ import { getPackageInfo, PackageInfo, PackageJson } from './package-info.js';
 
 import { GlopSourceInput } from './source-input.js';
 import { TransformerHandler } from '../resolution/package.js';
-import { copyFileSync } from 'fs';
+import { copyFileSync, existsSync, unlinkSync } from 'fs';
 import { logger } from '../logger/logger.js';
 
 
@@ -14,22 +15,17 @@ export class ESMTransformer {
 
     provider = new Map<string, PackageInfo>();
     nodeModulePath: string;
-
-    // workspaceTransformer: TransformerHandler;
-    // packageTransformer: TransformerHandler;
-    transformerHandler: TransformerHandler;
-
-
+    mapKeys: string[];
     source: GlopSourceInput;
     resources: GlopSourceInput;
     workspacePackage: PackageInfo;
     jsTransformer: JSTransformer;
+    transformerHandler: TransformerHandler;
 
-    constructor(public config: ESMConfig, public cwd: string) {
-        // this.workspaceTransformer = new WorkspaceTransformerHandler(config);
-        // this.packageTransformer = new PackageTransformerHandler(config);
+    constructor(public readonly config: ESMConfig, public readonly cwd: string) {
         this.transformerHandler = new TransformerHandler(config);
         this.initService();
+        this.mapKeys = Object.keys(this.config.pathMap || {});
     }
 
     addToProvider(provider: Map<string, PackageInfo>, pkgJson: PackageJson, nodeModulePath: string, outDir: string) {
@@ -55,21 +51,29 @@ export class ESMTransformer {
         });
     }
 
-    copyResourcesToSource(resources: string[], pkgInfo: PackageInfo) {
-        logger.info(`copy workspace resources: '${pkgInfo.getName()}'.`);
-        let mapKeys = Object.keys(this.config.pathMap || {});
-        if (mapKeys.length === 0) {
+    copyResourcesToSource(resources: string[]) {
+        if (this.mapKeys.length === 0) {
             return;
         }
-        resources.filter(path => isFile(path))
-            .forEach(path => {
-                let outPath = pkgInfo.resolveSrc(path);
-                mapKeys.forEach(key => {
-                    outPath = outPath.replace(key, this.config.pathMap[key]);
-                });
-                mkdirSyncIfNotExists(resolve(outPath, '..'));
-                copyFileSync(path, outPath);
-            });
+        resources
+            .filter(path => isFile(path))
+            .forEach(path => this.copyResourcesFile(path));
+    }
+
+    private copyResourcesFile(path: string) {
+        let outPath = this.workspacePackage.resolveSrc(path);
+        this.mapKeys.forEach(key => {
+            outPath = outPath.replace(key, this.config.pathMap[key]);
+        });
+        mkdirSyncIfNotExists(resolve(outPath, '..'));
+        copyFileSync(path, outPath);
+    }
+
+    private deleteResourcesFile(path: string) {
+        let outPath = this.workspacePackage.resolveSrc(path);
+        if (existsSync(outPath)) {
+            unlinkSync(outPath);
+        }
     }
 
     initService() {
@@ -110,47 +114,94 @@ export class ESMTransformer {
         });
     }
 
-    // private getWorkspaceTransformer(): TransformerHandler {
-    //     if (this.config.workspaceResolution === 'follow') {
-    //         return this.packageTransformer;
-    //     }
-    //     return this.workspaceTransformer;
-    // }
-
     transformWorkspace() {
         if (!this.config.prod) {
             logger.info(`copying workspace '${this.workspacePackage.getName()}' files to output dir.`);
             this.workspacePackage.copyFiles();
         }
-        this.copyResourcesToSource(this.resources.getFiles(), this.workspacePackage);
+        logger.info(`copy workspace resources: '${this.workspacePackage.getName()}'.`);
+        this.copyResourcesToSource(this.resources.getFiles());
         logger.info(`start transform workspace '${this.workspacePackage.getName()}'.`);
-        // let transformer = this.getWorkspaceTransformer();
-
         let transformedFiles: string[] = [];
         this.source.getFiles().forEach(path => {
             if (transformedFiles.includes(path)) {
                 return;
             }
             logger.info(`transform '${path}'.`);
-            this.transformerHandler.handle(path, this.workspacePackage.resolveOut(path), {
-                jsTransformer: this.jsTransformer,
-                nodeModulePath: this.nodeModulePath,
-                packageInfo: this.workspacePackage,
-                plugins: this.config.plugins,
-                outDir: this.config.outDir,
-                provider: this.provider
-            }, transformedFiles);
+            this.transformWorkspaceFile(path, transformedFiles);
         });
         this.workspacePackage.isTransformed = true;
         logger.info(`done transform workspace'${this.workspacePackage.getName()}'.`);
     }
 
+    private transformWorkspaceFile(path: string, transformedFiles?: string[]) {
+        this.transformerHandler.handle(path, this.workspacePackage.resolveOut(path), {
+            jsTransformer: this.jsTransformer,
+            nodeModulePath: this.nodeModulePath,
+            packageInfo: this.workspacePackage,
+            plugins: this.config.plugins,
+            outDir: this.config.outDir,
+            provider: this.provider
+        }, transformedFiles);
+    }
+
     watch() {
-        logger.info(`watch is not supported now.`);
+        // setup watcher for js files
+        this.watchSource();
+        this.watchResource();
+    }
+
+    private watchSource() {
+        const watcher = chokidar.watch(this.config.src.include, {
+            ignored: this.config.src.exclude,
+            persistent: true
+        });
+
+        watcher.add(this.config.src.files);
+        watcher
+            .on('ready', () => logger.info('Initial scan complete. Ready for changes'))
+            .on('add', (path, stats) => {
+                logger.info(`'${path}' added, transforming.`);
+                this.transformWorkspaceFile(path);
+            })
+            .on('change', (path, stats) => {
+                logger.info(`'${path}' added, transforming.`);
+                this.transformWorkspaceFile(path);
+            })
+            .on('unlink', path => {
+                logger.info(`File ${path} has been removed`);
+                let outPath = this.workspacePackage.resolveOut(path);
+                if (existsSync(outPath)) {
+                    unlinkSync(outPath);
+                }
+            });
+    }
+
+    private watchResource() {
+
+        const watcher = chokidar.watch(this.config.resources.include, {
+            ignored: this.config.resources.exclude,
+            persistent: true
+        });
+
+        watcher.add(this.config.resources.files);
+        watcher
+            .on('add', (path, stats) => {
+                logger.info(`copy file: '${path}'`);
+                this.copyResourcesFile(path);
+            })
+            .on('change', (path, stats) => {
+                logger.info(`copy file: '${path}'`);
+                this.copyResourcesFile(path);
+            })
+            .on('unlink', path => {
+                logger.info(`File ${path} has been removed`);
+                this.deleteResourcesFile(path);
+            });
     }
 
     watchForPackage() {
-        logger.info(`watch is not supported now.`);
+        logger.info(`watch form package is not supported yet.`);
     }
 }
 

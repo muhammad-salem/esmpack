@@ -1,13 +1,14 @@
 // import { glob } from 'glob';
 import { SourceInput } from './config.js';
-import pkg from 'glob';
-const { glob } = pkg;
+import globPackage from 'glob';
+
+const { glob } = globPackage;
 
 export class GlopSourceInput {
     private found: string[];
     constructor(public srcInput: SourceInput) { }
 
-    private getPattern(path: string[]) {
+    private getGlobPattern(path: string[]) {
         return path.length > 1 ?
             `{${path.join(',')}}` : path.length === 1 ? path[0] : '';
     }
@@ -15,7 +16,7 @@ export class GlopSourceInput {
     scanFiles() {
         let include: string[], files: string[];
         if (this.srcInput.include.length > 0) {
-            include = glob.sync(this.getPattern(this.srcInput.include),
+            include = glob.sync(this.getGlobPattern(this.srcInput.include),
                 { ignore: this.srcInput.exclude }
             );
         } else {
@@ -23,7 +24,7 @@ export class GlopSourceInput {
         }
 
         if (this.srcInput.files.length > 0) {
-            files = glob.sync(this.getPattern(this.srcInput.files));
+            files = glob.sync(this.getGlobPattern(this.srcInput.files));
         } else {
             files = [];
         }
