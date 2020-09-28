@@ -157,7 +157,7 @@ export interface ESMConfig {
 
 export interface ConfigPluginHandler {
     test: RegExp;
-    moduleType: FetchType | MarkType;
+    moduleType?: FetchType | MarkType;
     handler?: (importSyntax: ImportSyntax, relativeFilePath: string) => PluginAction;
 }
 /**
