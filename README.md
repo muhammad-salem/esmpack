@@ -58,16 +58,37 @@ Options:
     -h      --help      print help message
     -v      --version   output the version number
 ```
+## esmpack config files,
 
-# Javascript Config file
+if didn't provide a config path to the cli, will search for config file in the `process.cwd()` for file name `esmpack.config.js` if not found, then search for  `esmpack.config.mjs`, then `esmpack.config.json`, if non of them found, will exits with error code.
 
-Could be a js module file with default export as `ESMConfig` object. in that case make sure the `package.json` is marked as module package, `{"type": "module"}`. this options is useful for loading external plugins or override the built-in plugins behavior. 
+### Javascript Config file
+
+ - js config file, proved a way to connect `esmpack` with any plugin, the built-in plugins can be called by its name `css, html, json, text, image, audio`.
+if no plugins had provided, will add the built-in plugins as default;  
+
+ - JS Module File, to create and load plugins, The built in plugin, will try to fetch the resource with `fetch` request, and will be defined then.
+
+ - The Built-in plugin provide 3 different information about the resource file, 
+    - 1-  `value` : content itself, its type controlled by the plugin, import `.json` file will return json object, import `.txt`, `.css` and `.html` will return a string object.
+    - 2- `url` : a url for the resources.
+    - 3- `promise`: the promise to listen, to be notified with the fetch result.
+
+
+Could be a js module file with default export as `JSConfig Interface` object. in that case make sure the `package.json` is marked as module package, `{"type": "module"}`. this options is useful for nodejs when (importing a non `.mjs`) OR ( import `.js`) file.
 
 ```js
-import { CSSPlugin, HTMLPlugin, ImagePlugin, JSONPlugin, TextPlugin } from '@aurorats/esmpack';
-export const config = {
-    outDir: 'build/mjs/',
+let pdfHandler = (importSyntax, relativeFilePath) => {
+    /**
+     * write plugin for pdf files
+     * convert the pdf file to js module with default export as content of the pdf as `string`. 
+     */
+    return {action: 'module'};
+};
+
+const config = {
     moduleResolution: 'relative',
+    outDir: 'build/web_modules/',
     pathMap: { 'src': 'dist' },
     src: {
         files: [],
@@ -80,25 +101,26 @@ export const config = {
         exclude: ['./src/**/*.{js,ts,tsx}']
     },
     plugins: [
-        CSSPlugin,
-        JSONPlugin,
-        ImagePlugin,
-        HTMLPlugin,
-        TextPlugin
+        'css',
+        'html',
+        'image',
+        'json',
+        'txt',
+        { text: /\.pdf$/g, handler: pdfHandler },
+        { test: /\.xml$/g, moduleType: 'text'},
     ]
 };
 export default config;
 ```
-if no plugins had provided, will add the built-in plugins as default;  
 
 # JSON Config file
 
-plugins options will be the name of built-in plugin.
+ - for now the built-in plugin the oly pne supported.
 
 ```json
 {
     "moduleResolution": "relative",
-    "outDir": "build/mjs/",
+    "outDir": "public/web_modules/",
     "pathMap": {
         "src": "dist"
     },
@@ -253,12 +275,15 @@ export interface ESMConfig {
 ## ClI JSConfig Interface
 
 ```ts
+
+type ConfigPlugin = string| { text: /\.pdf$/g, handler: (importSyntax: ImportSyntax, relativeFilePath: string): PluginAction };
+
 export interface JSConfig {
     outDir: string;
     src?: SourceInput;
     resources?: SourceInput;
     pathMap?: { [key: string]: string };
-    extension?: ModuleExtension;
+    extension?:  ".js" | ".mjs";
     moduleResolution?: 'relative' | 'static' | 'flat';
     baseUrl?: string;
     workspaceResolution?: 'all' | 'follow';
@@ -269,49 +294,110 @@ export interface JSConfig {
 
 # How to build A Plugin
 
-- for now all plugin intercepting only `import` and `export` statement.
-- to create a plugin must extend class `Plugin` and provide plugin name and regex for testing
-
+- for now all built-in plugin intercepting only `import` statement, `export` statement not implemented yet.
 ```ts
-import { ClassInfo, Plugin } from '@aurorats/esmpack';
-@ClassInfo('css', /\.css$/g)
-export class CSSPlugin extends Plugin {
-    inject(url: string): string {
-        // import 'bootstrap/dist/css/bootstrap.min.css';
-    }
-    fetch(url: string, importName: string): string {
-        // import bootstrap from 'bootstrap/dist/css/bootstrap.min.css';
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        // import bootstrap, {promise as whenCSSFileLoaded} from './bootstrap.min.css';
-    }
+/**
+ *  inject: replace import statement with code.
+ * `fetch`: replace the import statement with a fetch request code, from the inline.
+ *  module: convert the resource file to a js module, and import its default.
+ * 
+ *  inline: hold code to be replaced with the import statement.
+ */
+
+class PluginAction { action: 'inject' | 'fetch' | 'module', inline?: string }
+let pdfHandler = (importSyntax: ImportSyntax, relativeFilePath: string): PluginAction => {
+    // write plugin for pdf files
+    return {action: 'module'};
+};
+
+/**
+ * provide a new plugin with the help of built-in plugin behavior.
+ */
+let mdPluginHandler = new Plugin('text');
+
+let pngImage = new Plugin('objectURL');
+
+let config = {
+    ...
+    plugins: [
+        'json',
+        { test: /\.pdf$/g, handler: pdfHandler },
+        { test: /\.xml$/g, moduleType: 'text' },
+        { test: /\.md$/g}, handler: mdPluginHandler },
+        { test: /\.png$/g, handler: pngImage }
+    ]
 }
 ```
+possible moduleType are: 
+  `text`, `json`, `blob`, `arrayBuffer`, `file`, `uint8`, `objectURL`, `base64` and `dataBase64`.
 
-or Simply
+
+
+ ## Example 
+
+ `app/file.html`
+
+ ```html
+ <h1> Hello from HTML</h1>
+ ```
+
+ `app/main-module.js`
+
+ ```ts
+import htmlContent, {url, promise, html} from './file1.html';
+
+console.log(htmlContent);   // print undefined
+console.log(html);          // print undefined
+console.log(url);           // print 'http://site-url/{outDir}/app/file1.html'
+
+promise.then(content => {
+    console.log(htmlContent);   // print '<h1> Hello from HTML</h1>'
+    console.log(html);          // print '<h1> Hello from HTML</h1>'
+    console.log(content);       // print '<h1> Hello from HTML</h1>'
+
+    console.log(content == htmlContent); // print true
+    console.log(content == html);        // print true, the same object
+})
+.catch(reason => console.error('failed loading html file'));
+
+ ```
+
+`@aurora/esmpack` support operator `as` for renaming the default exported names in the wildcard
 
 ```ts
-import { Plugin } from '@aurorats/esmpack';
-export class CSSPlugin extends Plugin {
+import json, {promise as jsonPromise} from './file.json';
+import text, {promise as textPromise} from './file.txt';
 
-    static getName(): string { return 'css'; };
-    static getRegExp(): RegExp { return /\.css$/g; }
+import {url as imageUrl} from './image.jpg';
 
-    inject(url: string): string {
-        // import 'bootstrap/dist/css/bootstrap.min.css';
-    }
-    fetch(url: string, importName: string): string {
-        // import bootstrap from 'bootstrap/dist/css/bootstrap.min.css';
-    }
-    fetchWithPromise(url: string, promiseName: string, importName?: string): string {
-        // import bootstrap, {promise as whenCSSFileLoaded} from './bootstrap.min.css';
-    }
-}
-```
+file1Promise.then(content => {
+    ....
+});
+
+textPromise.then(content => {
+    ....
+});
+
+ ```
+
+`@aurora/esmpack` support operator `export` from a non-js file.
+
+
+```ts
+/// <reference types="@aurorats/types" />
+
+export * from './file.json';
+export * from './file.txt'; 
+/**will throw error at runtime, 
+ * keep aware of renaming wildcard binding names, so not conflict with each other.
+ * Consider explicitly re-exporting to resolve the ambiguity
+ */
+
+export {url as imageUrl, jpg as imageObject} from './image.jpg';
+export * as image from './image.jpg';
+ ```
 
 ## TO:DO
 
-- watch
-- production
-- set extension of module file to '.js' or '.mjs', currently, doesn't override filename.
-- moduleResolution `static` and `flat` : currently `relative` is supported
+ - set extension of module file to '.js' or '.mjs', currently, doesn't override filename.
+ - moduleResolution `static` and `flat`: currently `relative` is supported
