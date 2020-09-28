@@ -118,28 +118,9 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
         jsConfig.resources = { include: ["**/*"], files: [], exclude: ['node_modules/**/*'] }
     }
 
-    jsConfig.plugins ??= [
-        'css',
-        'html',
-        'img',
-        'json',
-        'txt'
-    ];
+    jsConfig.plugins ??= [];
 
-    let esmConfig: ESMConfig = {
-        outDir: jsConfig.outDir,
-        src: jsConfig.src,
-        resources: jsConfig.resources,
-        pathMap: jsConfig.pathMap || {},
-        extension: jsConfig.extension,
-        moduleResolution: jsConfig.moduleResolution,
-        baseUrl: jsConfig.baseUrl,
-        workspaceResolution: jsConfig.workspaceResolution,
-        plugins: [],
-        prod
-    };
-
-    esmConfig.plugins = jsConfig.plugins
+    let pluginHandler = jsConfig.plugins
         .map(pluginRef => {
             if (typeof pluginRef === 'string') {
                 return findPluginByName(pluginRef);
@@ -153,6 +134,19 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
             }
         })
         .filter(plugin => plugin);
+
+    let esmConfig: ESMConfig = {
+        outDir: jsConfig.outDir,
+        src: jsConfig.src,
+        resources: jsConfig.resources,
+        pathMap: jsConfig.pathMap || {},
+        extension: jsConfig.extension,
+        moduleResolution: jsConfig.moduleResolution,
+        baseUrl: jsConfig.baseUrl,
+        workspaceResolution: jsConfig.workspaceResolution,
+        plugins: pluginHandler,
+        prod
+    };
     return esmConfig;
 }
 
