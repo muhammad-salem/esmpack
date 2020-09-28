@@ -1,5 +1,6 @@
 import { resolve } from 'path';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
+import { logger } from '../logger/logger.js';
 import { FetchType, MarkType } from '../plugins/injection/fetch.js';
 import { trackPackage } from '../utils/utils.js';
 
@@ -316,8 +317,8 @@ export class JSTransformer {
                 let ext = /\.m?js$/g.test(newPath) ? undefined : '.js';
                 return new JsTransformDescription('inline', newPath, ext, pkgInfo);
             } else {
-                console.warn(`Couldn't found package in node_module`, {
-                    path: match.modulePath,
+                logger.error(`Couldn't found package in node_module`, {
+                    path: match.statement,
                     node_module: options.nodeModulePath
                 });
                 return new JsTransformDescription('keep', undefined, undefined, options.pkgInfo);
