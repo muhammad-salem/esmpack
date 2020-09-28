@@ -1,8 +1,0 @@
-{
-  "name": "esm-test",
-  "main": "dist/index.js",
-  "type": "module",
-  "devDependencies": {
-    "@aurorats/esmpack": "^0.1.0"
-  }
-}
