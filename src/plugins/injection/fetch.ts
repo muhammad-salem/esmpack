@@ -1,4 +1,3 @@
-import { type } from 'os';
 import { ImportSyntax } from '../../resolution/transform.js';
 
 let requestUrl: string, init: { [key: string]: any };
