@@ -18,7 +18,7 @@ const help = inputs.includes('-h') || inputs.includes('--help');
 if (help) {
     let helpStr =
         `
-Version 0.1.4
+Version 0.1.6
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
@@ -43,7 +43,7 @@ Options:
 }
 const version = inputs.includes('-v') || inputs.includes('--version');
 if (version) {
-    console.log('0.1.4');
+    console.log('0.1.6');
     exit();
 }
 const watch = inputs.includes('-w') || inputs.includes('--watch');
@@ -70,9 +70,8 @@ function deleteFolderRecursive(dirPath: string) {
 function lunchApp(config: ESMConfig) {
     deleteFolderRecursive(config.outDir);
     const transform = new ESMTransformer(config, process.cwd());
-    transform.transformDependencies();
     transform.transformWorkspace();
-
+    transform.transformDependencies();
     if (watch) {
         transform.watch();
     }
@@ -84,7 +83,6 @@ function lunchAppForPackageConfig(config: ESMConfig) {
     transform.provider.set(transform.workspacePackage.getName(), transform.workspacePackage);
     transform.transformDependencies();
     // transform.transformWorkspace();
-
     if (watch) {
         transform.watchForPackage();
     }
