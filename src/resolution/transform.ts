@@ -1,8 +1,8 @@
 import { resolve } from 'path';
-import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
+import { PackageInfo } from '../esmpack/package-info.js';
 import { logger } from '../logger/logger.js';
-import { FetchType, MarkType } from '../plugins/injection/fetch.js';
-import { trackPackage } from '../utils/utils.js';
+import { MarkType } from '../plugins/injection/fetch.js';
+import { TrackPackageType } from '../utils/utils.js';
 
 
 export class NameAlias {
@@ -107,6 +107,11 @@ export class ImportSyntax {
      */
     marker: MarkType = '' as MarkType;
 
+    /**
+     * the mark of path
+     */
+    quoteMarks: string;
+
     constructor(match: RegExpExecArray) {
         this.init(match);
     }
@@ -145,11 +150,12 @@ export class ImportSyntax {
 
     private handelObjectNames(objectNames: string) {
         let temp = objectNames.split(',');
-        this.exportNames = temp.map(str => this.getNameAndAlias(str));
+        this.exportNames = temp.filter(str => str.trim()).map(str => this.getNameAndAlias(str));
     }
     private init(match: RegExpExecArray) {
         this.statement = match[0];
         this.syntaxType = new SyntaxType(match[1] as SyntaxTypeRef);
+        this.quoteMarks = match[3].substring(0, 1);
         this.modulePath = match[3].substring(1, match[3].length - 1);
         let mark = this.modulePath.indexOf('!');
         if (mark > 0) {
@@ -161,6 +167,7 @@ export class ImportSyntax {
             return;
         }
         let objectNames = match[2].trim();
+        objectNames = objectNames.replace(/(\r\n|\n|\r)/gm, '');
         let bracesIndex = objectNames.indexOf('{');
         if (bracesIndex > -1) {
             if (bracesIndex > 0) {
@@ -235,11 +242,11 @@ export interface TransformOptions {
     /**
      * the current processing file which 'importStatement' fond in.
      */
-    currentJsPath: string;
+    hostJsPath: string;
     /**
      * current package info, 
      */
-    pkgInfo: PackageInfo;
+    hostPackageInfo: PackageInfo;
 
     /**
      * provider for all listed packages,
@@ -251,6 +258,9 @@ export interface TransformOptions {
      * build dir of current package
      */
     buildDir: string;
+
+    targetPackageInfo?: PackageInfo;
+    tracker?: TrackPackageType;
 }
 
 /**
@@ -272,16 +282,11 @@ export class JsTransformDescription {
      * append this extension for file inline path. 
      */
     appendExt?: string;
-    /**
-     * the package of inlinePath
-     */
-    pkgInfo?: PackageInfo;
 
-    constructor(action: JsTransformAction, inlinePath?: string, appendExt?: string, pkgInfo?: PackageInfo) {
+    constructor(action: JsTransformAction, inlinePath?: string, appendExt?: string) {
         this.action = action;
         this.inlinePath = inlinePath;
         this.appendExt = appendExt;
-        this.pkgInfo = pkgInfo;
     }
 
 }
@@ -297,31 +302,24 @@ export class JSTransformer {
 
     transform(match: ImportSyntax, options: TransformOptions): JsTransformDescription | undefined {
         if (/^\.\.?\/.*\.m?js$/g.test(match.modulePath)) {
-            return new JsTransformDescription('keep', undefined, undefined, options.pkgInfo);
+            return new JsTransformDescription('keep');
         } else if (/^\.\.?\//g.test(match.modulePath)) {
             //appendExt: options.pkgInfo.pkg.browser ? '.js' : (options.pkgInfo.isModule ? '.mjs' : '.js')
-            return new JsTransformDescription('inline', match.modulePath, '.js', options.pkgInfo);
+            return new JsTransformDescription('inline', match.modulePath, '.js');
         } else {
-            let pkgTrack = trackPackage(match.modulePath, options.nodeModulePath);
-            if (pkgTrack) {
-                let pkgInfo: PackageInfo, isCreated: boolean = false;
-                if (options.packageProvider.has(pkgTrack.packageName)) {
-                    pkgInfo = options.packageProvider.get(pkgTrack.packageName) as PackageInfo;
-                } else {
-                    pkgInfo = getPackageInfo(pkgTrack.packagePath, options.buildDir);
-                    isCreated = true;
-                }
-                let newPath = pkgTrack.subPath
-                    ? pkgInfo.resolveSubPackage(options.currentJsPath, pkgTrack.subPath)
-                    : pkgInfo.relativeOut(resolve(options.currentJsPath, '..'));
+            if (options.tracker && options.targetPackageInfo) {
+
+                let newPath = options.tracker.subPath
+                    ? options.targetPackageInfo.resolveSubPackage(options.hostJsPath, options.tracker.subPath)
+                    : options.targetPackageInfo.relativeOut(resolve(options.hostJsPath, '..'));
                 let ext = /\.m?js$/g.test(newPath) ? undefined : '.js';
-                return new JsTransformDescription('inline', newPath, ext, pkgInfo);
+                return new JsTransformDescription('inline', newPath, ext);
             } else {
                 logger.error(`Couldn't found package in node_module`, {
                     path: match.statement,
                     node_module: options.nodeModulePath
                 });
-                return new JsTransformDescription('keep', undefined, undefined, options.pkgInfo);
+                return new JsTransformDescription('keep');
             }
         }
     }
