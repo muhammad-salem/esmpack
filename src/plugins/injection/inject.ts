@@ -6,8 +6,8 @@ function __GetModuleDir() {
     return __moduleDir__;
 }
 
-function injectStyle() {
-    (function () {
+function fetchStyle() {
+    (() => {
         fetch(__GetModuleDir() + requestUrl, init)
             .then(response => response.text())
             .then(response => {
@@ -18,16 +18,26 @@ function injectStyle() {
     })();
 }
 
+function loadStyle() {
+    (() => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = __GetModuleDir() + requestUrl;
+        document.head.append(link);
+    })();
+}
+
 function removeCode() {
 
 }
 
-export type InjectType = 'style';
+export type InjectType = 'fetch:style' | 'load:style';
 
 
 export function getInjectCallback(injectType?: InjectType): Function {
     switch (injectType) {
-        case 'style': return injectStyle;
+        case 'fetch:style': return fetchStyle;
+        case 'load:style': return loadStyle;
         default: return removeCode;
     }
 }
