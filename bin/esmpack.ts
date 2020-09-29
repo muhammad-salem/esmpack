@@ -18,7 +18,7 @@ const help = inputs.includes('-h') || inputs.includes('--help');
 if (help) {
     let helpStr =
         `
-Version 0.1.6
+Version 0.1.7
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
@@ -43,7 +43,7 @@ Options:
 }
 const version = inputs.includes('-v') || inputs.includes('--version');
 if (version) {
-    console.log('0.1.6');
+    console.log('0.1.7');
     exit();
 }
 const watch = inputs.includes('-w') || inputs.includes('--watch');
