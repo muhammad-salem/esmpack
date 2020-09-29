@@ -1,9 +1,9 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
-import { relative, resolve, sep } from 'path';
+import { relative, resolve } from 'path';
 import { ImportSyntax, JsTransformDescription, JSTransformer } from './transform.js';
 import { getPackageInfo, PackageInfo } from '../esmpack/package-info.js';
 import { PluginHandler } from '../plugins/plugin.js';
-import { getFileExtension, isDirectory, matchFileExtension, mkdirSyncIfNotExists, resolveTrackPackagePath, trackPackage } from '../utils/utils.js';
+import { getFileExtension, isDirectory, mkdirSyncIfNotExists, trackPackage, TrackPackageType } from '../utils/utils.js';
 import { ESMConfig } from '../esmpack/config.js';
 import { generateHelper } from '../plugins/injection/helpers.js';
 
@@ -17,7 +17,8 @@ export interface HelperOptions {
 }
 
 export function getCommentPattern() {
-    return /\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/g;
+    // return /\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm;
+    return /(?:(?:^|\s)\/\/(.+?)$)|(?:\/\*(.*?)\*\/)/gms;
 }
 
 export class TransformerHandler {
@@ -53,45 +54,64 @@ export class TransformerHandler {
         let allMatch = ImportSyntax.getImportSyntax(searchContent);
 
         allMatch.forEach(importSyntax => {
-            let ext = matchFileExtension(importSyntax.modulePath);
-            if (ext && ! /m?js/g.test(ext[1])) {
-                // plugin scope
-                let plugin = this.searchPlugin(importSyntax.modulePath, opt.plugins);
-                if (!plugin) {
-                    console.error(`can't find module for file extension '${ext[1]}'`, importSyntax.statement);
+
+            let filePath: string, outPath: string;
+            let targetPackageInfo: PackageInfo | undefined;
+            let tracker: TrackPackageType | undefined;
+            if (/^\./.test(importSyntax.modulePath)) {
+                // workspace resources
+                outPath = resolve(outDir, importSyntax.modulePath);
+                filePath = resolve(srcDir, importSyntax.modulePath);
+            } else {
+                tracker = trackPackage(importSyntax.modulePath, opt.nodeModulePath);
+                if (!tracker) {
+                    console.error(`can't find node package for '${importSyntax.modulePath}'`);
                     return;
                 }
-                let filePath: string, outPath: string;
-                if (/^\./.test(importSyntax.modulePath)) {
-                    // workspace resources
-                    outPath = resolve(outDir, importSyntax.modulePath);
-                    filePath = resolve(srcDir, importSyntax.modulePath);
-                    if (!existsSync(filePath)) {
-                        // try to resolve from resources
-                        return;
-                    }
-                } else {
-                    let pkgTrack = trackPackage(importSyntax.modulePath, opt.nodeModulePath);
-                    if (!pkgTrack) {
-                        console.error(`can't find node package resources for '${importSyntax.modulePath}'`);
-                        return;
-                    }
-                    let pkgInfo: PackageInfo;
-                    if (opt.provider.has(pkgTrack.packageName)) {
-                        pkgInfo = opt.provider.get(pkgTrack.packageName) as PackageInfo;
-                    } else {
-                        pkgInfo = getPackageInfo(pkgTrack.packagePath, opt.outDir);
-                        opt.provider.set(pkgInfo.getName(), pkgInfo);
-                    }
-                    outPath = pkgTrack.subPath || pkgInfo.packageModel.style;
-                    if (outPath) {
-                        outPath = pkgInfo.resolveOut(outPath);
-                    } else {
-                        outPath = opt.outDir + sep + pkgTrack.packageName + sep + pkgTrack.subPath;
-                    }
-                    filePath = resolveTrackPackagePath(pkgTrack);
-                }
 
+                if (opt.provider.has(tracker.packageName)) {
+                    targetPackageInfo = opt.provider.get(tracker.packageName) as PackageInfo;
+                } else {
+                    targetPackageInfo = getPackageInfo(tracker.packagePath, opt.outDir);
+                    opt.provider.set(targetPackageInfo.getName(), targetPackageInfo);
+                }
+                if (tracker.subPath) {
+                    outPath = targetPackageInfo.resolveOut(tracker.subPath);
+                    filePath = resolve(tracker.nodeModulePath, tracker.packageName, tracker.subPath);
+                } else {
+                    outPath = resolve(opt.outDir, tracker.packageName, targetPackageInfo.index);
+                    filePath = resolve(tracker.nodeModulePath, tracker.packageName, targetPackageInfo.index);
+                }
+            }
+            {
+                let isDir = isDirectory(filePath);
+                if (!existsSync(filePath) || isDir) {
+                    if (existsSync(filePath + inputExt)) {
+                        filePath += inputExt;
+                        outPath += inputExt;
+                    } else if (isDir) {
+                        let fileTemp = resolve(filePath, 'index' + inputExt);
+                        if (existsSync(fileTemp)) {
+                            filePath = fileTemp;
+                            outPath = resolve(outPath, 'index' + inputExt);
+                        } else {
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
+                }
+            }
+
+
+            if (! /\.m?js$/g.test(filePath)) {
+                // plugin scope
+
+                let plugin = this.searchPlugin(importSyntax.modulePath, opt.plugins);
+                if (!plugin) {
+                    console.error(`can't find plugin for  '${importSyntax.statement}'`);
+                    return;
+                }
                 // this.config.baseUrl = this.config.baseUrl || '/';
                 // let staticFilePath = this.config.baseUrl + relative(opt.outDir, outPath);
                 // let result = plugin.handler.transform(match, staticFilePath);
@@ -115,27 +135,37 @@ export class TransformerHandler {
                     writeFileSync(outPath, resModuleContent);
                 }
             } else {
-
-                // js module scop
                 let result = opt.jsTransformer.transform(importSyntax, {
                     buildDir: opt.packageInfo.out,
-                    currentJsPath: output,
+                    hostJsPath: output,
                     nodeModulePath: opt.nodeModulePath,
                     packageProvider: opt.provider,
-                    pkgInfo: opt.packageInfo
+                    hostPackageInfo: opt.packageInfo,
+                    targetPackageInfo,
+                    tracker
                 });
                 if (result) {
-                    let options: StatementActionOptions = {
-                        content,
-                        followImport,
-                        result,
-                        match: importSyntax,
-                        helperOptions: opt,
-                        srcDir,
-                        outDir
-                    };
-                    this.handleStatementAction(options);
-                    content = options.content;
+                    let followPath = importSyntax.modulePath;
+                    if (result?.action === 'inline' && result.inlinePath && /^\/|\.\/|\.\.\//.test(result.inlinePath)) {
+                        followPath = result.inlinePath + (result.appendExt || '');
+                        let newPath = importSyntax.quoteMarks + followPath + importSyntax.quoteMarks;
+                        let oldPath = importSyntax.quoteMarks + importSyntax.modulePath + importSyntax.quoteMarks;
+                        let newStatement = importSyntax.statement.replace(oldPath, newPath);
+
+                        let srcStatement = importSyntax.statement;
+                        let srcLastLineIndex = importSyntax.statement.lastIndexOf('\n');
+                        if (srcLastLineIndex > 0) {
+                            srcStatement = srcStatement.substring(srcLastLineIndex + 1);
+                            newStatement = newStatement.substring(newStatement.lastIndexOf('\n') + 1);
+                        }
+                        content = content.replace(srcStatement, newStatement);
+                        if (targetPackageInfo && targetPackageInfo !== opt.packageInfo) {
+                            return;
+                        }
+                    }
+                    let followSrc = resolve(srcDir, followPath);
+                    let followOut = resolve(outDir, followPath);
+                    followImport.push({ src: followSrc, out: followOut });
                 }
             }
         });
@@ -143,7 +173,8 @@ export class TransformerHandler {
             if (injectModuleInfo) {
                 content = generateHelper('define:prod') + content;
             }
-            // minify content before write
+            // TO:DO minify content before write
+            // TO:DO remove source map im prod mode
 
         } else {
             if (injectModuleInfo) {
@@ -157,23 +188,6 @@ export class TransformerHandler {
         followImport.forEach(item => this.handle(item.src, item.out, opt, transformedFiles));
         // return [input].concat(followImport.map(files => files.src));
         return transformedFiles;
-    }
-
-    // abstract handleStatementAction(opt: StatementActionOptions): void;
-    handleStatementAction(opt: StatementActionOptions): void {
-        let followPath = opt.match.modulePath;
-        if (opt.result?.action === 'inline' && opt.result.inlinePath && /^\/|\.\/|\.\.\//.test(opt.result.inlinePath)) {
-            let newPath = opt.result.inlinePath + (opt.result.appendExt ? opt.result.appendExt : '');
-            let newStatement = opt.match.statement.replace(opt.match.modulePath, newPath);
-            opt.content = opt.content.replace(opt.match.statement, newStatement);
-            if (opt.result.pkgInfo && opt.result.pkgInfo !== opt.helperOptions.packageInfo) {
-                return;
-            }
-            followPath = newPath;
-        }
-        let followSrc = resolve(opt.srcDir, followPath);
-        let followOut = resolve(opt.outDir, followPath);
-        opt.followImport.push({ src: followSrc, out: followOut });
     }
 }
 
