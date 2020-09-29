@@ -147,7 +147,7 @@ class CSSPlugin extends Plugin {
                 return oldTransform(importSyntax, relativeFilePath);
             } catch (e) {
                 // inject css to dom
-                let code = generateInject('style', relativeFilePath);
+                let code = generateInject('load:style', relativeFilePath);
                 if (importSyntax.defaultExport) {
                     let fetch = generateFetchFor(relativeFilePath, importSyntax, this.moduleType);
                     code += fetch;
