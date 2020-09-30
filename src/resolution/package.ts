@@ -186,7 +186,6 @@ export class TransformerHandler {
         content = searchContent = '';
         transformedFiles.push(output);
         followImport.forEach(item => this.handle(item.src, item.out, opt, transformedFiles));
-        // return [input].concat(followImport.map(files => files.src));
         return transformedFiles;
     }
 }
