@@ -347,15 +347,15 @@ let config = {
 `app/main-module.js`
 
 ```ts
-import htmlContent, {url, promise, html} from './file1.html';
+import htmlContent, {url, promise, value} from './file1.html';
 
 console.log(htmlContent);   // print undefined
-console.log(html);          // print undefined
+console.log(value);          // print undefined
 console.log(url);           // print 'http://site-url/{outDir}/app/file1.html'
 
 promise.then(content => {
     console.log(htmlContent);   // print '<h1> Hello from HTML</h1>'
-    console.log(html);          // print '<h1> Hello from HTML</h1>'
+    console.log(value);          // print '<h1> Hello from HTML</h1>'
     console.log(content);       // print '<h1> Hello from HTML</h1>'
 
     console.log(content == htmlContent); // print true
