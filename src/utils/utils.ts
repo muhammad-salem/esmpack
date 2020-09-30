@@ -1,4 +1,4 @@
-import { Dir, existsSync, lstatSync, mkdirSync } from 'fs';
+import { Dir, existsSync, lstatSync, mkdirSync, readdirSync } from 'fs';
 import { resolve, sep } from 'path';
 
 export function isContainNodePackage(dir: Dir | string) {
@@ -33,10 +33,23 @@ export type TrackPackageType = {
     subPath?: string;
 };
 
+export function isNodeModuleDirEmpty(path: string) {
+    let dirs = readdirSync(path);
+    if (dirs.length === 0) {
+        return true;
+    } else if (dirs.length === 1 && dirs[0] === '.bin') {
+        return true
+    }
+    return false;
+}
 export function trackNodeModulePath(cwd: string): string {
     let path = isContainNodeModule(cwd);
     if (path) {
-        return path;
+        if (isNodeModuleDirEmpty(path)) {
+            cwd = resolve(cwd, '..');
+        } else {
+            return path;
+        }
     } else if (cwd === sep) {
         return '';
     }
