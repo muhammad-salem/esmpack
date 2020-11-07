@@ -45,9 +45,7 @@ export function isNodeModuleDirEmpty(path: string) {
 export function trackNodeModulePath(cwd: string): string {
     let path = isContainNodeModule(cwd);
     if (path) {
-        if (isNodeModuleDirEmpty(path)) {
-            cwd = resolve(cwd, '..');
-        } else {
+        if (!isNodeModuleDirEmpty(path)) {
             return path;
         }
     } else if (cwd === sep) {
