@@ -1,10 +1,10 @@
 {
-  "name": "@aurorats/esmpack",
-  "version": "0.1.8",
+  "name": "@ibyar/esmpack",
+  "version": "0.1.9",
   "description": "esmpack, transform javascript files to es module that can be imported by browser.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "repository": "https://github.com/aurorats/esmpack",
+  "repository": "https://github.com/ibyar/esmpack",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -26,16 +26,17 @@
     "publish:npm": "npm publish --registry https://registry.npmjs.org "
   },
   "dependencies": {
-    "chokidar": "^3.4.3",
+    "chokidar": "^3.5.0",
     "glob": "^7.1.6"
   },
   "devDependencies": {
     "@types/glob": "^7.1.3",
-    "@types/node": "^14.14.6",
-    "typescript": "^4.0.5"
+    "@types/node": "^14.14.20",
+    "typescript": "^4.1.3"
   },
   "keywords": [
     "aurora",
+    "ibyar",
     "esmpack",
     "esm",
     "module",

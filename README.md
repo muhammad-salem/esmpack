@@ -6,14 +6,14 @@
 ![npm-dependencies][npm-dep-url]
 ![GitHub contributors][contributors]
 
-[npm-image]: https://img.shields.io/npm/v/@aurorats/esmpack.svg
-[npm-url]: https://npmjs.org/package/@aurorats/esmpack
-[downloads-image]: https://img.shields.io/npm/dt/@aurorats/esmpack
-[downloads-url]: https://npmjs.org/package/@aurorats/esmpack
-[license-img]: https://img.shields.io/github/license/aurorats/esmpack
-[license-url]: https://github.com/aurorats/esmpack/blob/master/LICENSE
-[npm-dep-url]: https://img.shields.io/david/aurorats/esmpack.svg?maxAge=2592000
-[contributors]: https://img.shields.io/github/contributors/aurorats/esmpack
+[npm-image]: https://img.shields.io/npm/v/@ibyar/esmpack.svg
+[npm-url]: https://npmjs.org/package/@ibyar/esmpack
+[downloads-image]: https://img.shields.io/npm/dt/@ibyar/esmpack
+[downloads-url]: https://npmjs.org/package/@ibyar/esmpack
+[license-img]: https://img.shields.io/github/license/ibyar/esmpack
+[license-url]: https://github.com/ibyar/esmpack/blob/master/LICENSE
+[npm-dep-url]: https://img.shields.io/david/ibyar/esmpack.svg?maxAge=2592000
+[contributors]: https://img.shields.io/github/contributors/ibyar/esmpack
 
 esmpack, transform javascript files to es module that can be imported by browser.
 
@@ -22,14 +22,14 @@ esmpack, transform javascript files to es module that can be imported by browser
  - As Global
 
 ``` bash
-npm i -g @aurorats/esmpack
-yarn global add @aurorats/esmpack
+npm i -g @ibyar/esmpack
+yarn global add @ibyar/esmpack
 ```
  - As Developer Dependencies
 
 ``` bash
-npm i --save-dev @aurorats/esmpack
-yarn add --dev @aurorats/esmpack
+npm i --save-dev @ibyar/esmpack
+yarn add --dev @ibyar/esmpack
 ```
 
 # How to use
@@ -386,7 +386,7 @@ textPromise.then(content => {
 `@aurora/esmpack` support operator `export` from a non-js file.
 
 ```ts
-/// <reference types="@aurorats/types" />
+/// <reference types="@ibyar/types" />
 
 export * from './file.json';
 export * from './file.txt'; 
