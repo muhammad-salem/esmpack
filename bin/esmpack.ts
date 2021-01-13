@@ -18,7 +18,7 @@ const help = inputs.includes('-h') || inputs.includes('--help');
 if (help) {
     let helpStr =
         `
-Version 0.1.7
+Version 0.1.9
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
