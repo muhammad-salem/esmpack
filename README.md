@@ -37,7 +37,7 @@ yarn add --dev @ibyar/esmpack
 can load config from js file (es module), or json file, if not 
 
 ```
-Version 0.1.4
+Version 0.1.9
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
