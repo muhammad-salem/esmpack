@@ -11,6 +11,7 @@ import {
     setLogLevel, LogLevel, PackageJson, getPackageIndex, logger, TypeOf, Plugin, PluginHandler
 } from '../dist/index.js';
 
+const APP_VERSION = '0.1.93';
 
 const args = process.argv;
 const inputs = args.slice(2);
@@ -18,7 +19,7 @@ const help = inputs.includes('-h') || inputs.includes('--help');
 if (help) {
     let helpStr =
         `
-Version 0.1.9
+Version ${APP_VERSION}
 Usage: esmpack [config path] [options]
 
 if no config file in the commend will try to search for file names
@@ -43,7 +44,7 @@ Options:
 }
 const version = inputs.includes('-v') || inputs.includes('--version');
 if (version) {
-    console.log('0.1.7');
+    console.log(APP_VERSION);
     exit();
 }
 const watch = inputs.includes('-w') || inputs.includes('--watch');
@@ -51,7 +52,6 @@ const debug = inputs.includes('-d') || inputs.includes('--debug');
 const silent = inputs.includes('-s') || inputs.includes('--silent');
 const prod = inputs.includes('--prod');
 let configPath = inputs.find(arg => /(\.m?js$)|(.json)/g.test(arg));
-
 
 function deleteFolderRecursive(dirPath: string) {
     if (existsSync(dirPath)) {
@@ -67,6 +67,7 @@ function deleteFolderRecursive(dirPath: string) {
     }
     logger.debug(dirPath, ' -- removed');
 }
+
 function lunchApp(config: ESMConfig) {
     deleteFolderRecursive(config.outDir);
     const transform = new ESMTransformer(config, process.cwd());
