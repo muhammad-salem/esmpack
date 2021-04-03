@@ -41,7 +41,7 @@ export interface PackageJson {
 }
 
 export class PackageInfo {
-    isTransformed: boolean = false;
+    transformed: boolean = false;
     // files: string[];
     constructor(
         public packageModel: PackageJson,

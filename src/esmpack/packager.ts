@@ -95,7 +95,7 @@ export class ESMTransformer {
 
     transformDependencies() {
         this.provider.forEach(dependency => {
-            if (!dependency.isTransformed) {
+            if (!dependency.transformed) {
                 if (!this.config.prod) {
                     logger.debug(`copying dependency: '${dependency.getName()}' files to output dir.`);
                     dependency.copyFiles();
@@ -109,7 +109,7 @@ export class ESMTransformer {
                     outDir: this.config.outDir,
                     provider: this.provider
                 });
-                dependency.isTransformed = true;
+                dependency.transformed = true;
             }
         });
     }
@@ -130,7 +130,7 @@ export class ESMTransformer {
             logger.info(`transform '${path}'.`);
             this.transformWorkspaceFile(path, transformedFiles);
         });
-        this.workspacePackage.isTransformed = true;
+        this.workspacePackage.transformed = true;
         logger.info(`done transform workspace'${this.workspacePackage.getName()}'.`);
     }
 
