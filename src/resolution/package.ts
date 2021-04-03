@@ -118,22 +118,24 @@ export class TransformerHandler {
                 let relativeFilePath = relative(outDir, outPath);
                 injectModuleInfo = true;
                 let result = plugin.handler.transform(importSyntax, relativeFilePath);
-                if (result.action === 'replace') {
-                    content = content.replace(importSyntax.statement, result.inline);
-                } else if (result.action === 'fetch') {
-                    content = content.replace(importSyntax.statement, result.inline);
-                    mkdirSyncIfNotExists(resolve(outPath, '..'));
-                    copyFileSync(filePath, outPath);
-                } else {
-                    /**result.action === 'module'**/
-                    let statement = importSyntax.toDefaultModuleStatementString(inputExt);
-                    content = content.replace(importSyntax.statement, statement);
-                    let buffer = readFileSync(filePath);
-                    let resModuleContent = `export default ${JSON.stringify(buffer.toString())};`;
-                    outPath += '.' + inputExt;
-                    mkdirSyncIfNotExists(resolve('outPath', '..'));
-                    writeFileSync(outPath, resModuleContent);
-                }
+                switch (result.action) {
+					case 'replace':
+					case 'fetch':
+						content = content.replace(importSyntax.statement, result.inline);
+						mkdirSyncIfNotExists(resolve(outPath, '..'));
+						copyFileSync(filePath, outPath);
+						break;
+					case 'module':
+					default:
+						let statement = importSyntax.toDefaultModuleStatementString(inputExt);
+						content = content.replace(importSyntax.statement, statement);
+						let buffer = readFileSync(filePath);
+						let resModuleContent = `export default ${JSON.stringify(buffer.toString())};`;
+						outPath += '.' + inputExt;
+						mkdirSyncIfNotExists(resolve('outPath', '..'));
+						writeFileSync(outPath, resModuleContent);
+						break;
+				}
             } else {
                 let result = opt.jsTransformer.transform(importSyntax, {
                     buildDir: opt.packageInfo.out,
