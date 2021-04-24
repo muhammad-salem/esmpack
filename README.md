@@ -324,7 +324,7 @@ let config = {
         'json',
         { test: /\.pdf$/g, handler: pdfHandler },
         { test: /\.xml$/g, moduleType: 'text' },
-        { test: /\.md$/g}, handler: mdPluginHandler },
+        { test: /\.md$/g, handler: mdPluginHandler },
         { test: /\.png$/g, handler: pngImage }
     ]
 }
