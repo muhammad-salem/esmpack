@@ -19,6 +19,7 @@ export interface PackageJson {
     description: string;
     type: string;
     main: string;
+    exports?: string | Record<string, string>;
     browser: string;
     module: string;
     esm2015: string;
@@ -118,8 +119,18 @@ export function isContainModule(pkg: PackageJson) {
     return (pkg.esm2015 || pkg['jsnext:main'] || pkg.module || pkg.type === 'module') ? true : false;
 }
 
+export function getPackageExports(exports?: string | Record<string, string>) {
+    if (exports == undefined) {
+        return undefined;
+    } else if (typeof exports === 'string') {
+        return exports;
+    }
+    const entries = Object.entries(exports);
+    return entries.find(entry => entry[0] === '.')?.[1] || entries?.[0]?.[1];
+}
+
 export function getPackageIndex(pkg: PackageJson) {
-    return pkg.esm2015 || pkg['jsnext:main'] || pkg.module || pkg.main || pkg.browser || 'index.js';
+    return pkg.esm2015 || pkg['jsnext:main'] || pkg.module || pkg.main || pkg.browser || getPackageExports(pkg.exports)|| 'index.js';
 }
 
 export function getPackageInfo(packagePath: string, buildDir: string): PackageInfo {
