@@ -310,7 +310,7 @@ export class JSTransformer {
             if (options.tracker && options.targetPackageInfo) {
 
                 let newPath = options.tracker.subPath
-                    ? options.targetPackageInfo.resolveSubPackage(options.hostJsPath, options.tracker.subPath)
+                    ? options.targetPackageInfo.resolveSubPackage(resolve(options.hostJsPath, '..'), options.tracker.subPath)
                     : options.targetPackageInfo.relativeOut(resolve(options.hostJsPath, '..'));
                 let ext = /\.m?js$/g.test(newPath) ? undefined : '.js';
                 return new JsTransformDescription('inline', newPath, ext);

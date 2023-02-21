@@ -21,12 +21,21 @@ export function getCommentPattern() {
     return /(?:(?:^|\s)\/\/(.+?)$)|(?:\/\*(.*?)\*\/)/gms;
 }
 
+export function getSourceMapPattern() {
+    return /(\/\*+[\s\S]*?sourceMappingURL\s*=[\s\S]*?\*\/)|(\/\/.*?sourceMappingURL\s*=.*?[\r\n])/g;
+}
+
 export class TransformerHandler {
 
     constructor(protected config: ESMConfig) { }
 
     private removeComments(content: string) {
         return content.replace(getCommentPattern(), '');
+    }
+
+    private removeSourceMap(content: string) {
+        // return content.replace(getSourceMapPattern(), '');
+        return content.replace(/# sourceMappingURL=(.+?\.map)/g, "# $1");
     }
 
     private searchPlugin(path: string, plugins: PluginHandler[]) {
@@ -175,9 +184,9 @@ export class TransformerHandler {
             if (injectModuleInfo) {
                 content = generateHelper('define:prod') + content;
             }
+            // remove source map im prod mode
+            content = this.removeSourceMap(content);
             // TO:DO minify content before write
-            // TO:DO remove source map im prod mode
-
         } else {
             if (injectModuleInfo) {
                 content = content + '\n' + generateHelper('define:dev');
