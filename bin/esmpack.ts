@@ -11,7 +11,7 @@ import {
     setLogLevel, LogLevel, PackageJson, getPackageIndex, logger, TypeOf, Plugin, PluginHandler
 } from '../dist/index.js';
 
-const APP_VERSION = '0.1.93';
+const APP_VERSION = '1.0.0';
 
 const args = process.argv;
 const inputs = args.slice(2);
