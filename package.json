@@ -25,7 +25,7 @@
     "local:publish": "npm unpublish --tag dev --registry http://localhost:4873/ --force && npm publish --tag dev --registry http://localhost:4873/ --force",
     "publish:npm": "npm publish --registry https://registry.npmjs.org ",
     "pack": "npm pack",
-    "publish": "npm run clean & npm run build & npm publish"
+    "publish": "npm run clean && npm run build && npm publish"
   },
   "dependencies": {
     "chokidar": "^3.5.1",
