@@ -184,7 +184,7 @@ export class ESMTransformer {
             persistent: true
         });
 
-        watcher.add(this.config.resources.files);
+        watcher.add(this.config.src.files);
         watcher
             .on('add', (path, stats) => {
                 logger.info(`copy file: '${path}'`);

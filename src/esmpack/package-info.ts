@@ -1,7 +1,7 @@
 import { copyFileSync } from 'fs';
 import { relative, resolve, sep } from 'path';
 import { readJSON } from '../utils/reader.js';
-import { isFile, mkdirSyncIfNotExists } from '../utils/utils.js';
+import { isDirectory, isFile, mkdirSyncIfNotExists } from '../utils/utils.js';
 import { SourceInput } from './config.js';
 import { GlopSourceInput } from './source-input.js';
 
@@ -100,7 +100,9 @@ export class PackageInfo {
         return relative(outputPath, this.outIndex());
     }
     resolveSubPackage(outputPath: string, subPath: string): string {
-        let sub = resolve(subPath, this.index);
+        const internal = resolve(this.src, subPath);
+        const isDir = isDirectory(internal);
+        const sub = isDir ? resolve(this.out, subPath, 'index') : resolve(this.out, subPath);
         return relative(outputPath, sub);
     }
     resolveInternalPackage(outputPath: string, internalPath: string, subPath?: string): string {
