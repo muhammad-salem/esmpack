@@ -23,7 +23,9 @@
     "build": "npm run clean && npx tsc -b -v",
     "build:watch": "npm run clean && npx tsc -b -v -w",
     "local:publish": "npm unpublish --tag dev --registry http://localhost:4873/ --force && npm publish --tag dev --registry http://localhost:4873/ --force",
-    "publish:npm": "npm publish --registry https://registry.npmjs.org "
+    "publish:npm": "npm publish --registry https://registry.npmjs.org ",
+    "pack": "npm pack",
+    "publish": "npm run clean & npm run build & npm publish"
   },
   "dependencies": {
     "chokidar": "^3.5.1",
