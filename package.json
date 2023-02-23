@@ -28,6 +28,7 @@
     "publish": "npm run clean && npm run build && npm publish"
   },
   "dependencies": {
+    "@ibyar/expressions": "^0.8.6",
     "chokidar": "^3.5.1",
     "glob": "^7.1.6"
   },
