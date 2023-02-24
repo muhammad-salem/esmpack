@@ -57,7 +57,7 @@ export class TransformerHandler {
         mkdirSyncIfNotExists(outDir);
 
         let searchContent = this.removeComments(content);
-        let followImport: { src: string, out: string }[] = [];
+        const followImport: { src: string, out: string }[] = [];
         let injectModuleInfo = false;
 
         let allMatch = ImportSyntax.getImportSyntax(searchContent);

@@ -61,16 +61,11 @@ export class ImportSyntax {
     }
 
     static getImportSyntax(content: string): ImportSyntax[] {
-        if (content) {
-            let match = content.match(ImportSyntax.getModuleRegExp());
-            if (match) {
-                return match
-                    .map(statement => ImportSyntax.getModuleRegExp().exec(statement))
-                    .filter(arr => arr !== null)
-                    .map(match => new ImportSyntax(match as RegExpExecArray));
-            }
-        }
-        return [];
+        return content?.match(ImportSyntax.getModuleRegExp())
+            ?.map(statement => ImportSyntax.getModuleRegExp().exec(statement))
+            .filter(arr => arr !== null)
+            .map(match => new ImportSyntax(match as RegExpExecArray))
+            ?? [];
     }
 
     /**
@@ -140,8 +135,7 @@ export class ImportSyntax {
         if (objectNames === '*') {
             this.importAll = new NameAlias('*');
         } else if (objectNames.includes(',')) {
-            let temp = objectNames.split(',');
-            temp.map(str => this.getNameAndAlias(str))
+            objectNames.split(',').map(str => this.getNameAndAlias(str))
                 .forEach(nameAlias => this.handleDefaultAndAll(nameAlias));
         } else {
             this.handleDefaultAndAll(this.getNameAndAlias(objectNames));
@@ -152,6 +146,7 @@ export class ImportSyntax {
         let temp = objectNames.split(',');
         this.exportNames = temp.filter(str => str.trim()).map(str => this.getNameAndAlias(str));
     }
+
     private init(match: RegExpExecArray) {
         this.statement = match[0];
         this.syntaxType = new SyntaxType(match[1] as SyntaxTypeRef);
