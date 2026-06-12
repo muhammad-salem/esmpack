@@ -27,13 +27,13 @@ if no config file in the commend will try to search for file names
 
 Examples:
     esmpack
-    esmpack esmpack.config.js.js
+    esmpack esmpack.config.js
     esmpack esmpack.config.json -w -d
     esmpack -v
     esmpack --help
 
 Options:
-            --prod      build for production, minify modules, css, etc...
+    -p      --prod      build for production, minify modules, css, etc...
     -d      --debug     output debug messages on internal operations
     -s      --silent    don't print any thing
     -w      --watch     watch files for change
@@ -50,7 +50,7 @@ if (version) {
 const watch = inputs.includes('-w') || inputs.includes('--watch');
 const debug = inputs.includes('-d') || inputs.includes('--debug');
 const silent = inputs.includes('-s') || inputs.includes('--silent');
-const prod = inputs.includes('--prod');
+const prod = inputs.includes('-p') || inputs.includes('--prod');
 let configPath = inputs.find(arg => /(\.m?js$)|(.json)/g.test(arg));
 
 function deleteFolderRecursive(dirPath: string) {
