@@ -25,26 +25,30 @@ export function getSourceMapPattern() {
     return /(\/\*+[\s\S]*?sourceMappingURL\s*=[\s\S]*?\*\/)|(\/\/.*?sourceMappingURL\s*=.*?[\r\n])/g;
 }
 
-export class TransformerHandler {
+export abstract class AbstractTransformerHandler {
 
     constructor(protected config: ESMConfig) { }
 
-    private removeComments(content: string) {
+    protected removeComments(content: string) {
         return content.replace(getCommentPattern(), '');
     }
 
-    private removeSourceMap(content: string) {
+    protected removeSourceMap(content: string) {
         // return content.replace(getSourceMapPattern(), '');
         return content.replace(/# sourceMappingURL=(.+?\.map)/g, "# $1");
     }
 
-    private searchPlugin(path: string, plugins: PluginHandler[]) {
+    protected searchPlugin(path: string, plugins: PluginHandler[]) {
         return plugins.find(plugin => {
             let isTheOne = plugin.regexp.test(path);
             plugin.regexp.lastIndex = 0;
             return isTheOne;
         });
     }
+}
+
+
+export class TransformerHandler extends AbstractTransformerHandler {
 
     handle(input: string, output: string, opt: HelperOptions, transformedFiles: string[] = []): string[] | false {
         if (isDirectory(input) || !existsSync(input) || transformedFiles.includes(output)) {
