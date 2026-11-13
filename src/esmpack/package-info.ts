@@ -130,7 +130,7 @@ export function getPackageExports(exports?: string | Record<string, string>) {
 }
 
 export function getPackageIndex(pkg: PackageJson) {
-    return pkg.esm2015 || pkg['jsnext:main'] || pkg.module || pkg.main || pkg.browser || getPackageExports(pkg.exports)|| 'index.js';
+    return pkg.esm2015 || pkg['jsnext:main'] || pkg.module || pkg.main || pkg.browser || getPackageExports(pkg.exports) || 'index.js';
 }
 
 export function getPackageInfo(packagePath: string, buildDir: string): PackageInfo {
@@ -138,7 +138,7 @@ export function getPackageInfo(packagePath: string, buildDir: string): PackageIn
     let inputFile = getPackageIndex(pkg);
     let isModule = isContainModule(pkg);
     let root = resolve(packagePath, '..');
-    let out = resolve(buildDir, pkg.name);
+    let out = resolve(buildDir, `${pkg.name}@${pkg.version}`);
     let info = new PackageInfo(pkg, root, out, inputFile, isModule);
     return info;
 }
