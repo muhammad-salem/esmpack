@@ -53,20 +53,24 @@ export class PackageInfo {
 
     }
     copyFiles() {
+        let srcInput: SourceInput = {
+            include: [this.src + '/**/*'],
+            exclude: [
+                this.src + '/node_modules/**/*'
+            ],
+            files: []
+        };
+
         let buildDir: string = relative(this.src, this.out);
         let slash = buildDir.indexOf('/');
         if (slash > 0) {
             buildDir = buildDir.substring(0, slash);
+            if (buildDir !== '..') {
+                srcInput.exclude.push(this.src + '/' + buildDir + '/**/*');
+            }
         }
-        let srcInput: SourceInput = {
-            include: [this.src + '/**/*'],
-            exclude: [
-                this.src + '/node_modules/**/*',
-                this.src + '/' + buildDir + '/**/*'
-            ],
-            files: []
-        };
-        let files = new GlopSourceInput(srcInput).getFiles();
+        const gsi = new GlopSourceInput(srcInput);
+        let files = gsi.getFiles();
         files.forEach(file => {
             let out = file.replace(this.src, '.');
             out = this.resolveOut(out);
