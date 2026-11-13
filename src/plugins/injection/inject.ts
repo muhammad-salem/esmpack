@@ -1,6 +1,6 @@
-let requestUrl: string, init: { [key: string]: any };
-
-let __moduleDir__: string;
+let requestUrl: string = '';
+let init: { [key: string]: any } = {};
+let __moduleDir__: string = '';
 
 function __GetModuleDir() {
     return __moduleDir__;

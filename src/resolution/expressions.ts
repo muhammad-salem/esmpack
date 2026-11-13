@@ -46,10 +46,10 @@ export class ModuleExpressionWalker extends AbstractTransformerHandler {
 
         const module = JavaScriptParser.parse(script, { addLocation: true });
 
-        const importExportList:ExpressionNode[] = [];
+        const importExportList: ExpressionNode[] = [];
 
         expressionVisitor.visit(module, collectImportExportExpression(importExportList));
-        
+
 
         let allMatch = ImportSyntax.getImportSyntax(searchContent);
 
@@ -165,8 +165,8 @@ export class ModuleExpressionWalker extends AbstractTransformerHandler {
                             return;
                         }
                     }
-                    let followSrc = resolve(srcDir, followPath);
-                    let followOut = resolve(outDir, followPath);
+                    const followSrc = resolve(srcDir, followPath);
+                    const followOut = resolve(outDir, followPath);
                     followImport.push({ src: followSrc, out: followOut });
                 }
             }

@@ -1,8 +1,8 @@
 // import { glob } from 'glob';
 import { SourceInput } from './config.js';
-import globPackage from 'glob';
+import { sync } from 'glob';
 
-const { glob } = globPackage;
+// const { glob } = globPackage;
 
 export class GlopSourceInput {
     private found: string[];
@@ -16,7 +16,7 @@ export class GlopSourceInput {
     scanFiles() {
         let include: string[], files: string[];
         if (this.srcInput.include.length > 0) {
-            include = glob.sync(this.getGlobPattern(this.srcInput.include),
+            include = sync(this.getGlobPattern(this.srcInput.include),
                 { ignore: this.srcInput.exclude }
             );
         } else {
@@ -24,13 +24,13 @@ export class GlopSourceInput {
         }
 
         if (this.srcInput.files.length > 0) {
-            files = glob.sync(this.getGlobPattern(this.srcInput.files));
+            files = sync(this.getGlobPattern(this.srcInput.files));
         } else {
             files = [];
         }
         let result = [...files, ...include];
         if (result.length === 0) {
-            result = glob.sync('**/*');
+            result = sync('**/*');
         }
         this.found = [...new Set<string>(result).values()];
     }

@@ -141,9 +141,9 @@ function toESMConfig(jsConfig: JSConfig): ESMConfig {
         pathMap: jsConfig.pathMap || {},
         extension: jsConfig.extension,
         moduleResolution: jsConfig.moduleResolution,
-        baseUrl: jsConfig.baseUrl,
+        baseUrl: jsConfig.baseUrl!,
         workspaceResolution: jsConfig.workspaceResolution,
-        plugins: pluginHandler,
+        plugins: pluginHandler.filter(handler => !!handler),
         prod
     };
     return esmConfig;
@@ -159,17 +159,18 @@ function initLogLevel() {
     }
 }
 
-function isFound(path: string) {
-    return existsSync(path) && path;
+function isFound(path?: string): string | false {
+    return (typeof path === 'string' && existsSync(path)) && path;
 }
 
 if (!configPath) {
     // search for js module as config
     configPath = isFound(resolve(process.cwd(), 'esmpack.config.js'))
         || isFound(resolve(process.cwd(), 'esmpack.config.mjs'))
-        || isFound(resolve(process.cwd(), 'esmpack.config.json'));
-    // || isFound(resolve(process.cwd(), 'package.json'));
-    if (isFound(configPath)) {
+        || isFound(resolve(process.cwd(), 'esmpack.config.json'))
+        // || isFound(resolve(process.cwd(), 'package.json'))
+        || undefined;
+    if (configPath && isFound(configPath)) {
         if (debug || !silent) {
             console.log(`load config from: ${configPath}`);
         }

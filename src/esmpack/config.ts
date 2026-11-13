@@ -45,6 +45,11 @@ export interface ESMConfig {
     outDir: string;
 
     /**
+     * how cache works, append package version to package (name + version) to url
+     */
+    cache?: 'append-version';
+
+    /**
      * location of input files
      */
     src: SourceInput;
