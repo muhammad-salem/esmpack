@@ -52,6 +52,7 @@ const debug = inputs.includes('-d') || inputs.includes('--debug');
 const silent = inputs.includes('-s') || inputs.includes('--silent');
 const prod = inputs.includes('-p') || inputs.includes('--prod');
 let configPath = inputs.find(arg => /(\.m?js$)|(.json)/g.test(arg));
+const currentWorkingDirectory = process.cwd();
 
 function deleteFolderRecursive(dirPath: string) {
     if (existsSync(dirPath)) {
@@ -68,9 +69,10 @@ function deleteFolderRecursive(dirPath: string) {
     logger.debug(dirPath, ' -- removed');
 }
 
+
 function lunchApp(config: ESMConfig) {
     deleteFolderRecursive(config.outDir);
-    const transform = new ESMTransformer(config, process.cwd());
+    const transform = new ESMTransformer(config, currentWorkingDirectory);
     transform.transformWorkspace();
     transform.transformDependencies();
     if (watch) {
@@ -80,7 +82,7 @@ function lunchApp(config: ESMConfig) {
 
 function lunchAppForPackageConfig(config: ESMConfig) {
     deleteFolderRecursive(config.outDir);
-    const transform = new ESMTransformer(config, process.cwd());
+    const transform = new ESMTransformer(config, currentWorkingDirectory);
     transform.provider.set(transform.workspacePackage.getName(), transform.workspacePackage);
     transform.transformDependencies();
     // transform.transformWorkspace();
@@ -159,27 +161,31 @@ function initLogLevel() {
     }
 }
 
-function isFound(path?: string): string | false {
+function getPath(path?: string): string | false {
     return (typeof path === 'string' && existsSync(path)) && path;
 }
 
-if (!configPath) {
+function isFound(path?: string): path is string {
+    return !!getPath(path);
+}
+
+if (configPath) {
+    configPath = resolve(currentWorkingDirectory, configPath);
+} else {
     // search for js module as config
-    configPath = isFound(resolve(process.cwd(), 'esmpack.config.js'))
-        || isFound(resolve(process.cwd(), 'esmpack.config.mjs'))
-        || isFound(resolve(process.cwd(), 'esmpack.config.json'))
-        // || isFound(resolve(process.cwd(), 'package.json'))
+    configPath = getPath(resolve(currentWorkingDirectory, 'esmpack.config.js'))
+        || getPath(resolve(currentWorkingDirectory, 'esmpack.config.mjs'))
+        || getPath(resolve(currentWorkingDirectory, 'esmpack.config.json'))
+        // || isFound(resolve(currentWorkingDirectory, 'package.json'))
         || undefined;
-    if (configPath && isFound(configPath)) {
-        if (debug || !silent) {
-            console.log(`load config from: ${configPath}`);
-        }
-    } else {
-        console.error(`no config file found`);
-        exit(404);
+}
+if (isFound(configPath)) {
+    if (debug || !silent) {
+        console.log(`load config from: ${configPath}`);
     }
 } else {
-    configPath = resolve(process.cwd(), configPath);
+    console.error(`no config file found`);
+    exit(404);
 }
 
 if (configPath.endsWith('.json')) {
